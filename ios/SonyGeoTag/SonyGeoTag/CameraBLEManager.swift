@@ -494,9 +494,11 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             }
             if resumeWhenBluetoothPowersOn || (backgroundLinkEnabled && canStart) {
                 resumeWhenBluetoothPowersOn = false
-                resumeBackgroundLink { [weak self] in
-                    self?.locationProvider?()
+                guard let currentLocationProvider = locationProvider else {
+                    appendLog("Background link waiting for location provider")
+                    return
                 }
+                resumeBackgroundLink(locationProvider: currentLocationProvider)
             }
         case .poweredOff, .unauthorized, .unsupported, .resetting, .unknown:
             state = .bluetoothUnavailable
