@@ -22,6 +22,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     @Published private(set) var rememberedPeripheralID = UserDefaults.standard.string(
         forKey: CameraBLEDefaults.rememberedPeripheralID
     )
+    @Published private(set) var pendingReconnectArmed = false
 
     var targetName = "ILCE-7CM2"
     var updateInterval: TimeInterval = CameraBLEDefaults.foregroundUpdateInterval
@@ -38,8 +39,14 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private var onQueueEmpty: (() -> Void)?
     private var resumeWhenBluetoothPowersOn = false
     private var manualStopRequested = false
+    private var reconnectRetryTimer: Timer?
     private let operationTimeout: TimeInterval = 12
     private let logger = Logger(subsystem: "com.narumi.SonyGeoTag", category: "BLE")
+    private let connectOptions: [String: Any] = [
+        CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+        CBConnectPeripheralOptionNotifyOnDisconnectionKey: true,
+        CBConnectPeripheralOptionNotifyOnNotificationKey: true,
+    ]
 
     override init() {
         super.init()
@@ -76,10 +83,23 @@ final class CameraBLEManager: NSObject, ObservableObject {
         if state == .linked {
             restartSendTimer()
         }
+        if backgroundLinkEnabled, canStart, locationProvider != nil {
+            armBackgroundReconnect(reason: "Background Link setting enabled")
+        }
+        if !backgroundLinkEnabled {
+            disarmPendingReconnect()
+        }
+    }
+
+    func setLocationProvider(_ locationProvider: @escaping () -> CLLocation?) {
+        self.locationProvider = locationProvider
+        if backgroundLinkEnabled, canStart {
+            armBackgroundReconnect(reason: "Location provider became available")
+        }
     }
 
     func startLink(locationProvider: @escaping () -> CLLocation?) {
-        self.locationProvider = locationProvider
+        setLocationProvider(locationProvider)
         manualStopRequested = false
         prepareForNewSession(resetCounters: true)
         appendLog("Starting Sony location link")
@@ -94,20 +114,13 @@ final class CameraBLEManager: NSObject, ObservableObject {
     }
 
     func resumeBackgroundLink(locationProvider: @escaping () -> CLLocation?) {
-        self.locationProvider = locationProvider
+        setLocationProvider(locationProvider)
         guard backgroundLinkEnabled else { return }
         guard canStart else { return }
         manualStopRequested = false
         prepareForNewSession(resetCounters: false)
         appendLog("Background link enabled; attempting camera reconnect")
-
-        guard centralManager.state == .poweredOn else {
-            resumeWhenBluetoothPowersOn = true
-            state = .bluetoothUnavailable
-            appendLog("Waiting for Bluetooth before background reconnect: \(centralManager.state.rawValue)")
-            return
-        }
-        connectToRememberedCameraOrScan()
+        armBackgroundReconnect(reason: "Background Link resume")
     }
 
     func stopLink() {
@@ -115,6 +128,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
         manualStopRequested = true
         resumeWhenBluetoothPowersOn = false
         centralManager.stopScan()
+        disarmPendingReconnect()
         stopTimer()
         stopOperationTimeout()
         state = .stopping
@@ -149,19 +163,38 @@ final class CameraBLEManager: NSObject, ObservableObject {
         didStartLocationSetup = false
         stopTimer()
         stopOperationTimeout()
+        reconnectRetryTimer?.invalidate()
+        reconnectRetryTimer = nil
         operationQueue.removeAll()
         pendingOperation = nil
         onQueueEmpty = nil
     }
 
     private func connectToRememberedCameraOrScan() {
-        if connectToRememberedCamera() {
+        if connectToRememberedCamera(reason: "remembered camera reconnect") {
             return
         }
         scanForCamera()
     }
 
-    private func connectToRememberedCamera() -> Bool {
+    @discardableResult
+    private func armBackgroundReconnect(reason: String) -> Bool {
+        guard backgroundLinkEnabled, !manualStopRequested else { return false }
+        guard centralManager.state == .poweredOn else {
+            resumeWhenBluetoothPowersOn = true
+            state = .bluetoothUnavailable
+            appendLog("Waiting for Bluetooth before pending reconnect: \(centralManager.state.rawValue)")
+            return false
+        }
+        if connectToRememberedCamera(reason: reason) {
+            return true
+        }
+        appendLog("No remembered camera for pending reconnect; falling back to scan")
+        scanForCamera()
+        return false
+    }
+
+    private func connectToRememberedCamera(reason: String) -> Bool {
         guard let rememberedPeripheralID,
               let identifier = UUID(uuidString: rememberedPeripheralID)
         else {
@@ -173,12 +206,51 @@ final class CameraBLEManager: NSObject, ObservableObject {
             return false
         }
 
-        appendLog("Connecting to remembered camera \(identifier.uuidString)")
-        state = .connecting
-        peripheral = rememberedPeripheral
-        rememberedPeripheral.delegate = self
-        centralManager.connect(rememberedPeripheral)
+        switch rememberedPeripheral.state {
+        case .connected:
+            appendLog("Remembered camera already connected; discovering services")
+            pendingReconnectArmed = false
+            peripheral = rememberedPeripheral
+            beginServiceDiscovery(for: rememberedPeripheral)
+        case .connecting:
+            appendLog("Pending reconnect already armed for remembered camera")
+            pendingReconnectArmed = true
+            state = .connecting
+            peripheral = rememberedPeripheral
+        case .disconnected, .disconnecting:
+            appendLog("Arming pending reconnect to remembered camera \(identifier.uuidString) (\(reason))")
+            pendingReconnectArmed = true
+            state = .connecting
+            peripheral = rememberedPeripheral
+            rememberedPeripheral.delegate = self
+            centralManager.connect(rememberedPeripheral, options: connectOptions)
+        @unknown default:
+            appendLog("Arming pending reconnect to remembered camera \(identifier.uuidString) (\(reason))")
+            pendingReconnectArmed = true
+            state = .connecting
+            peripheral = rememberedPeripheral
+            rememberedPeripheral.delegate = self
+            centralManager.connect(rememberedPeripheral, options: connectOptions)
+        }
         return true
+    }
+
+    private func disarmPendingReconnect() {
+        reconnectRetryTimer?.invalidate()
+        reconnectRetryTimer = nil
+        pendingReconnectArmed = false
+    }
+
+    private func scheduleReconnectRetry(reason: String) {
+        guard backgroundLinkEnabled, !manualStopRequested else { return }
+        reconnectRetryTimer?.invalidate()
+        let retryInterval = lowPowerModeEnabled
+            ? CameraBLEDefaults.lowPowerReconnectRetryInterval
+            : CameraBLEDefaults.foregroundReconnectRetryInterval
+        appendLog("Scheduling pending reconnect retry in \(Int(retryInterval))s (\(reason))")
+        reconnectRetryTimer = Timer.scheduledTimer(withTimeInterval: retryInterval, repeats: false) { [weak self] _ in
+            self?.armBackgroundReconnect(reason: "scheduled retry")
+        }
     }
 
     private func scanForCamera() {
@@ -494,11 +566,11 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             }
             if resumeWhenBluetoothPowersOn || (backgroundLinkEnabled && canStart) {
                 resumeWhenBluetoothPowersOn = false
-                guard let currentLocationProvider = locationProvider else {
+                guard locationProvider != nil else {
                     appendLog("Background link waiting for location provider")
                     return
                 }
-                resumeBackgroundLink(locationProvider: currentLocationProvider)
+                armBackgroundReconnect(reason: "Bluetooth powered on")
             }
         case .poweredOff, .unauthorized, .unsupported, .resetting, .unknown:
             state = .bluetoothUnavailable
@@ -529,26 +601,31 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             appendLog("Sony protocolVersion=\(info.protocolVersion.map(String.init) ?? "unknown")")
         }
         state = .connecting
+        pendingReconnectArmed = false
         central.stopScan()
         self.peripheral = peripheral
         remember(peripheral: peripheral)
-        central.connect(peripheral)
+        central.connect(peripheral, options: connectOptions)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         appendLog("Connected")
+        pendingReconnectArmed = false
+        reconnectRetryTimer?.invalidate()
+        reconnectRetryTimer = nil
         remember(peripheral: peripheral)
         beginServiceDiscovery(for: peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         appendLog(error?.localizedDescription ?? "Failed to connect")
+        pendingReconnectArmed = false
         self.peripheral = nil
         guard backgroundLinkEnabled, !manualStopRequested else {
             fail(error?.localizedDescription ?? "Failed to connect")
             return
         }
-        appendLog("Background link will scan after connect failure")
+        scheduleReconnectRetry(reason: error?.localizedDescription ?? "connect failed")
         scanForCamera()
     }
 
@@ -572,8 +649,8 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             return
         }
 
-        appendLog("Background link will reconnect after disconnect")
-        connectToRememberedCameraOrScan()
+        appendLog("Background link will arm pending reconnect after disconnect")
+        armBackgroundReconnect(reason: "peripheral disconnected")
     }
 
     func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
@@ -585,10 +662,12 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             restoredPeripheral.delegate = self
             remember(peripheral: restoredPeripheral)
             if restoredPeripheral.state == .connected {
+                pendingReconnectArmed = false
                 beginServiceDiscovery(for: restoredPeripheral)
             } else if backgroundLinkEnabled {
+                pendingReconnectArmed = true
                 state = .connecting
-                central.connect(restoredPeripheral)
+                central.connect(restoredPeripheral, options: connectOptions)
             }
         }
     }
@@ -711,4 +790,6 @@ private enum CameraBLEDefaults {
     static let rememberedPeripheralID = "rememberedPeripheralID"
     static let foregroundUpdateInterval: TimeInterval = 30
     static let lowPowerUpdateInterval: TimeInterval = 120
+    static let foregroundReconnectRetryInterval: TimeInterval = 30
+    static let lowPowerReconnectRetryInterval: TimeInterval = 120
 }

@@ -16,6 +16,7 @@ struct SonyGeoTagApp: App {
             )
             .onAppear {
                 appModel.prepareRuntimeHooks()
+                appModel.bootstrapBackgroundLinkIfNeeded(isForeground: true)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase != .active {
@@ -38,12 +39,30 @@ final class SonyGeoTagAppModel: ObservableObject {
     init() {
         registerBackgroundTasks()
         prepareRuntimeHooks()
+        bootstrapBackgroundLinkIfNeeded(isForeground: false)
     }
 
     func prepareRuntimeHooks() {
         locationProvider.onLocationUpdate = { [weak cameraManager] _ in
             cameraManager?.sendLocationIfDue()
         }
+        cameraManager.setLocationProvider { [weak locationProvider] in
+            locationProvider?.currentLocation
+        }
+    }
+
+    func bootstrapBackgroundLinkIfNeeded(isForeground: Bool) {
+        guard cameraManager.backgroundLinkEnabled else { return }
+        locationProvider.configure(
+            backgroundLinkEnabled: true,
+            lowPowerModeEnabled: cameraManager.lowPowerModeEnabled,
+            isForeground: isForeground
+        )
+        locationProvider.startUpdating()
+        cameraManager.resumeBackgroundLink { [weak locationProvider] in
+            locationProvider?.currentLocation
+        }
+        scheduleBackgroundRefresh()
     }
 
     func scheduleBackgroundRefresh() {

@@ -68,6 +68,7 @@ struct ContentView: View {
                     .font(.caption)
             }
             LabeledContent("DD11 interval", value: "\(Int(cameraManager.updateInterval))s")
+            LabeledContent("Pending reconnect", value: cameraManager.pendingReconnectArmed ? "Armed" : "—")
             if let rememberedPeripheralID = cameraManager.rememberedPeripheralID {
                 LabeledContent("Remembered", value: String(rememberedPeripheralID.prefix(8)))
             }

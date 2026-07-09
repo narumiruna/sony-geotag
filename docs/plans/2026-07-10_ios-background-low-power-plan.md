@@ -27,7 +27,7 @@ The app already declares `bluetooth-central` and `location` background modes and
 
 - [x] Add `BackgroundLinkSettings` storage for background-link and low-power preferences; verified by Swift typecheck and UI toggles backed by `@AppStorage`.
 - [x] Update `LocationProvider` with configurable low-power/active modes using significant-location changes plus standard updates only when needed; verified by `just check` and UI status showing active vs low-power mode.
-- [x] Update `CameraBLEManager` with CoreBluetooth restoration identifier, `willRestoreState`, last-peripheral persistence, reconnect-first behavior, and low-power send interval; verified with `just check`.
+- [x] Update `CameraBLEManager` with CoreBluetooth restoration identifier, `willRestoreState`, last-peripheral persistence, reconnect-first behavior, pending reconnect arming, retry scheduling, and low-power send interval; verified with `just check`.
 - [x] Add best-effort `BGAppRefreshTask` registration and Info.plist permissions for opportunistic background maintenance; verified with `just ios-check`.
 - [x] Update SwiftUI controls to enable background linking, low-power mode, Always Location guidance, and clear background limitations; verified with `just check`.
 - [x] Update docs for background behavior and validation limitations; verified by `README.md` and `ios/SonyGeoTag/README.md` diff.
@@ -42,7 +42,7 @@ The app already declares `bluetooth-central` and `location` background modes and
 ## Completion Checklist
 
 - [x] Background/low-power preferences are implemented and visible in `ios/SonyGeoTag/SonyGeoTag/ContentView.swift`, verified by `just check`.
-- [x] CoreBluetooth state restoration/reconnect support is implemented in `CameraBLEManager.swift`, verified by `just check`.
+- [x] CoreBluetooth state restoration/reconnect support, including pending reconnect arming, is implemented in `CameraBLEManager.swift`, verified by `just check`.
 - [x] Best-effort Background App Refresh support is implemented in `SonyGeoTagApp.swift` and `Info.plist`, verified by `just ios-check`.
 - [x] Low-power location behavior is implemented in `LocationProvider.swift`, verified by `just check`.
 - [x] Background behavior limitations and validation steps are documented, verified by README changes.
