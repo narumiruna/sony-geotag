@@ -60,6 +60,17 @@ uv run sonygeotag notify-log --duration 60 > notify-log.jsonl
 
 Most probe commands are read-only except for BLE connection/subscription behavior. `send-location --write` performs the known Sony DD30/DD31/DD11 location flow and writes GPS data to the camera.
 
+## Developer shortcuts
+
+Common Python, BLE, and iOS commands are available in `justfile`:
+
+```bash
+just --list
+just check
+just ios-open
+just ios-console
+```
+
 ## iOS MVP
 
 The first SwiftUI/CoreBluetooth/CoreLocation app scaffold lives in:
