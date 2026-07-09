@@ -16,9 +16,11 @@ Target camera:
 ```bash
 uv run sonygeotag scan --target ILCE-7CM2 --timeout 15
 uv run sonygeotag gatt-dump --target ILCE-7CM2 --timeout 10
+uv run sonygeotag read-values --target ILCE-7CM2 --pair --json > logs/read-values.json
+uv run sonygeotag notify-log --target ILCE-7CM2 --duration 60 --pair > logs/notify-log.jsonl
 ```
 
-Use `--json` when saving data for diffs.
+Use `--json` when saving scan/GATT/read data for diffs. `notify-log` streams JSONL by default so each notification packet is one line. If reads/subscriptions fail with insufficient authentication/encryption, retry with `--pair` and accept the camera pairing prompt.
 
 ## Observed primary services
 
@@ -73,9 +75,10 @@ These are interesting because they form simple write/notify pairs or belong to s
    - Bluetooth pairing screen
    - Creators' App connected
    - location linkage enabled/disabled
-2. Subscribe to notify characteristics and operate the camera manually.
-3. Capture official Creators' App traffic with Android Bluetooth HCI snoop or an external sniffer.
-4. Only after identifying the location-link characteristic and payload format, add write probes.
+2. Capture read values with `read-values` in the same states and diff the JSON output.
+3. Subscribe to notify characteristics with `notify-log` and operate the camera manually.
+4. Capture official Creators' App traffic with Android Bluetooth HCI snoop or an external sniffer.
+5. Only after identifying the location-link characteristic and payload format, add write probes.
 
 ## Safety rule
 
