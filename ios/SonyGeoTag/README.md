@@ -13,9 +13,10 @@ Minimal SwiftUI iOS app for sending iPhone GPS updates to a Sony Alpha camera ov
   3. write `DD30 = 01`
   4. write `DD31 = 01`
   5. read `DD32`, `DD33`, `DD21`
-  6. send `DD11` GPS packets every 30 seconds
+  6. send `DD11` GPS packets periodically to keep the camera's cached GPS state fresh
   7. cleanup with `DD31 = 00`, `DD30 = 00`
 - Uses CoreLocation for foreground/background GPS.
+- Offers a Background Link toggle and Low Power Mode.
 - Shows camera/GPS status and debug logs.
 
 ## Open in Xcode
@@ -48,6 +49,20 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 Use Xcode GUI with a physical iPhone for signing, installation, and real BLE/background-location validation.
+
+## Background and low power behavior
+
+The camera does not ask the app for GPS right before shutter release. Instead, SonyGeoTag proactively writes `DD11` location packets so the camera can use the most recently cached GPS fix when a new photo is captured.
+
+- High accuracy / foreground shooting: best GPS accuracy and a 30-second DD11 interval.
+- Low Power Mode: lower CoreLocation accuracy, significant-location-change monitoring, and a 120-second DD11 interval.
+- Background Link: asks for Always Location permission, remembers the last camera peripheral, enables CoreBluetooth restoration, and attempts reconnect/link recovery as iOS permits.
+
+Limitations:
+
+- iOS may throttle background scans and timers.
+- Force-quitting the app can prevent background relaunch.
+- Background behavior must be verified on a physical iPhone with the camera.
 
 ## Local protocol smoke test
 

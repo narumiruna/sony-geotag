@@ -6,8 +6,14 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var currentLocation: CLLocation?
     @Published private(set) var lastError: String?
     @Published private(set) var isUpdating = false
+    @Published private(set) var updateModeLabel = "Stopped"
+
+    var onLocationUpdate: ((CLLocation) -> Void)?
 
     private let manager = CLLocationManager()
+    private var backgroundLinkEnabled = false
+    private var lowPowerModeEnabled = true
+    private var isForeground = true
 
     override init() {
         authorizationStatus = manager.authorizationStatus
@@ -17,7 +23,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.distanceFilter = 5
         manager.pausesLocationUpdatesAutomatically = false
         #if os(iOS)
-        manager.allowsBackgroundLocationUpdates = true
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = true
         #endif
     }
 
@@ -62,7 +69,14 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         #endif
     }
 
-    func requestAuthorization() {
+    func configure(backgroundLinkEnabled: Bool, lowPowerModeEnabled: Bool, isForeground: Bool) {
+        self.backgroundLinkEnabled = backgroundLinkEnabled
+        self.lowPowerModeEnabled = lowPowerModeEnabled
+        self.isForeground = isForeground
+        applyLocationSettings()
+    }
+
+    func requestAuthorization(preferAlways: Bool = false) {
         switch authorizationStatus {
         case .notDetermined:
             #if os(iOS)
@@ -72,7 +86,11 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
             #endif
         #if os(iOS)
         case .authorizedWhenInUse:
-            manager.requestAlwaysAuthorization()
+            if preferAlways || backgroundLinkEnabled {
+                manager.requestAlwaysAuthorization()
+            } else {
+                startUpdating()
+            }
         #endif
         case .authorizedAlways:
             startUpdating()
@@ -88,15 +106,19 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         case .authorizedAlways:
             isUpdating = true
             lastError = nil
-            manager.startUpdatingLocation()
+            applyLocationSettings()
+            startLocationServices()
         #if os(iOS)
         case .authorizedWhenInUse:
             isUpdating = true
-            lastError = nil
-            manager.startUpdatingLocation()
+            lastError = backgroundLinkEnabled
+                ? "Background Link needs Always Location permission for reliable background updates."
+                : nil
+            applyLocationSettings()
+            startLocationServices()
         #endif
         case .notDetermined:
-            requestAuthorization()
+            requestAuthorization(preferAlways: backgroundLinkEnabled)
         case .denied, .restricted:
             lastError = "Location permission is not available."
         @unknown default:
@@ -106,11 +128,44 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func stopUpdating() {
         isUpdating = false
+        updateModeLabel = "Stopped"
         manager.stopUpdatingLocation()
+        manager.stopMonitoringSignificantLocationChanges()
+    }
+
+    private func applyLocationSettings() {
+        #if os(iOS)
+        manager.allowsBackgroundLocationUpdates = backgroundLinkEnabled
+        manager.showsBackgroundLocationIndicator = backgroundLinkEnabled
+        #endif
+
+        if lowPowerModeEnabled || !isForeground {
+            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            manager.distanceFilter = 50
+            updateModeLabel = isUpdating ? "Low power / significant changes" : "Low power ready"
+        } else {
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.distanceFilter = 5
+            updateModeLabel = isUpdating ? "High accuracy" : "High accuracy ready"
+        }
+    }
+
+    private func startLocationServices() {
+        if backgroundLinkEnabled || lowPowerModeEnabled {
+            manager.startMonitoringSignificantLocationChanges()
+        } else {
+            manager.stopMonitoringSignificantLocationChanges()
+        }
+        manager.startUpdatingLocation()
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+        #if os(iOS)
+        if backgroundLinkEnabled, authorizationStatus == .authorizedWhenInUse {
+            manager.requestAlwaysAuthorization()
+        }
+        #endif
         if isLocationAuthorized {
             startUpdating()
         }
@@ -120,6 +175,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         guard let location = locations.last else { return }
         currentLocation = location
         lastError = nil
+        onLocationUpdate?(location)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

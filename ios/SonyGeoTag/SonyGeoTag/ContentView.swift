@@ -4,15 +4,25 @@ import UIKit
 #endif
 
 struct ContentView: View {
-    @StateObject private var locationProvider = LocationProvider()
-    @StateObject private var cameraManager = CameraBLEManager()
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("backgroundLinkEnabled") private var backgroundLinkEnabled = false
+    @AppStorage("lowPowerModeEnabled") private var lowPowerModeEnabled = true
+
+    @ObservedObject private var locationProvider: LocationProvider
+    @ObservedObject private var cameraManager: CameraBLEManager
     @State private var didCopyDebugLog = false
+
+    init(locationProvider: LocationProvider, cameraManager: CameraBLEManager) {
+        self.locationProvider = locationProvider
+        self.cameraManager = cameraManager
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 cameraSection
                 locationSection
+                backgroundSection
                 controlsSection
                 logSection
             }
@@ -21,6 +31,18 @@ struct ContentView: View {
                 ToolbarItem(placement: .automatic) {
                     statusBadge
                 }
+            }
+            .onAppear {
+                applyRuntimeSettings(autoResume: backgroundLinkEnabled)
+            }
+            .onChange(of: backgroundLinkEnabled) { _, newValue in
+                applyRuntimeSettings(autoResume: newValue)
+            }
+            .onChange(of: lowPowerModeEnabled) { _, _ in
+                applyRuntimeSettings(autoResume: false)
+            }
+            .onChange(of: scenePhase) { _, _ in
+                applyRuntimeSettings(autoResume: backgroundLinkEnabled)
             }
             .onChange(of: locationProvider.currentLocation?.timestamp) { _, _ in
                 cameraManager.sendLocationIfDue()
@@ -45,6 +67,10 @@ struct ContentView: View {
                 LabeledContent("DD21", value: dd21ConfigHex)
                     .font(.caption)
             }
+            LabeledContent("DD11 interval", value: "\(Int(cameraManager.updateInterval))s")
+            if let rememberedPeripheralID = cameraManager.rememberedPeripheralID {
+                LabeledContent("Remembered", value: String(rememberedPeripheralID.prefix(8)))
+            }
             if let lastSentAt = cameraManager.lastSentAt {
                 LabeledContent("Last sent", value: lastSentAt.formatted(date: .omitted, time: .standard))
             }
@@ -58,6 +84,7 @@ struct ContentView: View {
     private var locationSection: some View {
         Section("iPhone GPS") {
             LabeledContent("Permission", value: locationProvider.statusLabel)
+            LabeledContent("Mode", value: locationProvider.updateModeLabel)
             LabeledContent("Coordinate", value: locationProvider.coordinateLabel)
             LabeledContent("Accuracy", value: locationProvider.accuracyLabel)
             if let lastError = locationProvider.lastError {
@@ -67,13 +94,32 @@ struct ContentView: View {
         }
     }
 
+    private var backgroundSection: some View {
+        Section("Background") {
+            Toggle("Background Link", isOn: $backgroundLinkEnabled)
+            Toggle("Low Power Mode", isOn: $lowPowerModeEnabled)
+
+            if backgroundLinkEnabled {
+                Text("Background Link needs Always Location permission and an initial successful camera connection. iOS may stop it after force-quit or throttle background scans.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if lowPowerModeEnabled {
+                Text("Low Power Mode lowers GPS accuracy and sends DD11 less often to reduce battery use.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var controlsSection: some View {
         Section("Controls") {
-            Button("Request Location Permission") {
-                locationProvider.requestAuthorization()
+            Button(backgroundLinkEnabled ? "Request Always Location Permission" : "Request Location Permission") {
+                locationProvider.requestAuthorization(preferAlways: backgroundLinkEnabled)
             }
 
             Button("Start Location Link") {
+                applyRuntimeSettings(autoResume: false)
                 locationProvider.startUpdating()
                 cameraManager.startLink {
                     locationProvider.currentLocation
@@ -136,6 +182,25 @@ struct ContentView: View {
         didCopyDebugLog = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             didCopyDebugLog = false
+        }
+    }
+
+    private func applyRuntimeSettings(autoResume: Bool) {
+        let isForeground = scenePhase == .active
+        locationProvider.configure(
+            backgroundLinkEnabled: backgroundLinkEnabled,
+            lowPowerModeEnabled: lowPowerModeEnabled,
+            isForeground: isForeground
+        )
+        cameraManager.configure(
+            backgroundLinkEnabled: backgroundLinkEnabled,
+            lowPowerModeEnabled: lowPowerModeEnabled
+        )
+
+        guard autoResume, backgroundLinkEnabled else { return }
+        locationProvider.startUpdating()
+        cameraManager.resumeBackgroundLink {
+            locationProvider.currentLocation
         }
     }
 }
