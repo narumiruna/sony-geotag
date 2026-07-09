@@ -60,6 +60,22 @@ uv run sonygeotag notify-log --duration 60 > notify-log.jsonl
 
 Most probe commands are read-only except for BLE connection/subscription behavior. `send-location --write` performs the known Sony DD30/DD31/DD11 location flow and writes GPS data to the camera.
 
+## iOS MVP
+
+The first SwiftUI/CoreBluetooth/CoreLocation app scaffold lives in:
+
+```bash
+ios/SonyGeoTag
+```
+
+Open with full Xcode:
+
+```bash
+open ios/SonyGeoTag/SonyGeoTag.xcodeproj
+```
+
+CLI target builds are verified with `/Applications/Xcode.app`; use Xcode GUI with a physical iPhone for signing, installation, BLE, and background-location validation.
+
 ## Notes
 
 See `docs/a7c2-ble-map.md` for the current observed A7C II BLE map.

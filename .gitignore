@@ -136,3 +136,8 @@ dmypy.json
 
 # Codex CLI
 .codex
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
