@@ -79,7 +79,7 @@ The first SwiftUI/CoreBluetooth/CoreLocation app scaffold lives in:
 ios/SonyGeoTag
 ```
 
-The iOS app proactively keeps the camera's latest GPS cache updated; the camera does not request GPS immediately before each shutter release. Background Link and Low Power Mode are available for physical-device testing.
+The iOS app proactively keeps the camera's latest GPS cache updated; the camera does not request GPS immediately before each shutter release. Background Link, Low Power Mode, CoreBluetooth restoration, and best-effort Background App Refresh are available for physical-device testing.
 
 Open with full Xcode:
 
