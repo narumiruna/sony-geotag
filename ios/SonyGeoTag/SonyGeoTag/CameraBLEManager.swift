@@ -24,7 +24,9 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private var sendTimer: Timer?
     private var operationQueue: [QueuedBLEOperation] = []
     private var pendingOperation: PendingBLEOperation?
+    private var operationTimeoutTimer: Timer?
     private var onQueueEmpty: (() -> Void)?
+    private let operationTimeout: TimeInterval = 12
 
     override init() {
         super.init()
@@ -57,6 +59,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     func stopLink() {
         appendLog("Stopping Sony location link")
         stopTimer()
+        stopOperationTimeout()
         state = .stopping
         operationQueue.removeAll()
         pendingOperation = nil
@@ -107,9 +110,8 @@ final class CameraBLEManager: NSObject, ObservableObject {
         state = .enablingLocation
         appendLog("Required Sony location characteristics found")
 
-        if let dd01 = characteristic(SonyProtocol.locationStatusNotifyUUID) {
-            peripheral?.setNotifyValue(true, for: dd01)
-            appendLog("Subscribed DD01 notifications")
+        if characteristic(SonyProtocol.locationStatusNotifyUUID) != nil {
+            enqueueNotify(name: "DD01 notify", uuid: SonyProtocol.locationStatusNotifyUUID, enabled: true, required: false)
         }
 
         if characteristic(SonyProtocol.pairingInitUUID) != nil {
@@ -217,6 +219,14 @@ final class CameraBLEManager: NSObject, ObservableObject {
         )
     }
 
+    private func enqueueNotify(name: String, uuid: String, enabled: Bool, required: Bool) {
+        operationQueue.append(
+            QueuedBLEOperation(name: name, required: required) { [weak self] in
+                self?.startNotify(name: name, uuid: uuid, enabled: enabled, required: required)
+            }
+        )
+    }
+
     private func runNextOperationIfNeeded() {
         guard pendingOperation == nil else { return }
         guard !operationQueue.isEmpty else {
@@ -236,7 +246,20 @@ final class CameraBLEManager: NSObject, ObservableObject {
             return
         }
         pendingOperation = .write(name: name, uuid: normalized(uuid), required: required)
-        peripheral.writeValue(data, for: characteristic, type: .withResponse)
+        startOperationTimeout()
+
+        if characteristic.properties.contains(.write) {
+            peripheral.writeValue(data, for: characteristic, type: .withResponse)
+            return
+        }
+        if characteristic.properties.contains(.writeWithoutResponse) {
+            appendLog("\(name) uses writeWithoutResponse")
+            peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
+            completeOperation(name: name, error: nil, required: required)
+            return
+        }
+
+        completeOperation(name: name, error: "Characteristic \(uuid) is not writable", required: required)
     }
 
     private func startRead(name: String, uuid: String, required: Bool, onValue: ((Data) -> Void)?) {
@@ -245,11 +268,23 @@ final class CameraBLEManager: NSObject, ObservableObject {
             return
         }
         pendingOperation = .read(name: name, uuid: normalized(uuid), required: required, onValue: onValue)
+        startOperationTimeout()
         peripheral.readValue(for: characteristic)
+    }
+
+    private func startNotify(name: String, uuid: String, enabled: Bool, required: Bool) {
+        guard let peripheral, let characteristic = characteristic(uuid) else {
+            completeOperation(name: name, error: "Missing characteristic \(uuid)", required: required)
+            return
+        }
+        pendingOperation = .notify(name: name, uuid: normalized(uuid), required: required, enabled: enabled)
+        startOperationTimeout()
+        peripheral.setNotifyValue(enabled, for: characteristic)
     }
 
     private func completeOperation(name: String, error: String?, required: Bool) {
         pendingOperation = nil
+        stopOperationTimeout()
         if let error {
             appendLog("\(name) failed: \(error)")
             if required {
@@ -270,6 +305,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
         lastError = message
         state = .failed
         stopTimer()
+        stopOperationTimeout()
         operationQueue.removeAll()
         pendingOperation = nil
         appendLog("Failed: \(message)")
@@ -278,6 +314,29 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private func stopTimer() {
         sendTimer?.invalidate()
         sendTimer = nil
+    }
+
+    private func startOperationTimeout() {
+        stopOperationTimeout()
+        operationTimeoutTimer = Timer.scheduledTimer(withTimeInterval: operationTimeout, repeats: false) { [weak self] _ in
+            self?.handleOperationTimeout()
+        }
+    }
+
+    private func stopOperationTimeout() {
+        operationTimeoutTimer?.invalidate()
+        operationTimeoutTimer = nil
+    }
+
+    private func handleOperationTimeout() {
+        guard let pendingOperation else { return }
+        self.pendingOperation = nil
+        appendLog("\(pendingOperation.name) timed out after \(Int(operationTimeout))s")
+        if pendingOperation.required {
+            fail("\(pendingOperation.name) timed out")
+        } else {
+            runNextOperationIfNeeded()
+        }
     }
 
     private func appendLog(_ message: String) {
@@ -425,8 +484,24 @@ extension CameraBLEManager: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        let characteristicUUID = normalized(characteristic.uuid)
+        if case let .notify(name, uuid, required, enabled) = pendingOperation, uuid == characteristicUUID {
+            if let error {
+                completeOperation(name: name, error: error.localizedDescription, required: required)
+                return
+            }
+            guard characteristic.isNotifying == enabled else {
+                completeOperation(name: name, error: "Notify state mismatch", required: required)
+                return
+            }
+            completeOperation(name: name, error: nil, required: required)
+            return
+        }
+
         if let error {
             appendLog("Notify state failed for \(characteristic.uuid.uuidString): \(error.localizedDescription)")
+        } else {
+            appendLog("Notify state \(characteristic.uuid.uuidString) isNotifying=\(characteristic.isNotifying)")
         }
     }
 }
@@ -440,4 +515,19 @@ private struct QueuedBLEOperation {
 private enum PendingBLEOperation {
     case write(name: String, uuid: String, required: Bool)
     case read(name: String, uuid: String, required: Bool, onValue: ((Data) -> Void)?)
+    case notify(name: String, uuid: String, required: Bool, enabled: Bool)
+
+    var name: String {
+        switch self {
+        case let .write(name, _, _), let .read(name, _, _, _), let .notify(name, _, _, _):
+            name
+        }
+    }
+
+    var required: Bool {
+        switch self {
+        case let .write(_, _, required), let .read(_, _, required, _), let .notify(_, _, required, _):
+            required
+        }
+    }
 }
