@@ -1,8 +1,12 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ContentView: View {
     @StateObject private var locationProvider = LocationProvider()
     @StateObject private var cameraManager = CameraBLEManager()
+    @State private var didCopyDebugLog = false
 
     var body: some View {
         NavigationStack {
@@ -92,6 +96,11 @@ struct ContentView: View {
 
     private var logSection: some View {
         Section("Debug Log") {
+            Button(didCopyDebugLog ? "Copied Debug Log" : "Copy Debug Log") {
+                copyDebugLog()
+            }
+            .disabled(cameraManager.logLines.isEmpty)
+
             if cameraManager.logLines.isEmpty {
                 Text("No log yet")
                     .foregroundStyle(.secondary)
@@ -117,5 +126,16 @@ struct ContentView: View {
             .padding(.vertical, 4)
             .background(cameraManager.state == .linked ? Color.green.opacity(0.2) : Color.secondary.opacity(0.15))
             .clipShape(Capsule())
+    }
+
+    private func copyDebugLog() {
+        let text = cameraManager.logLines.joined(separator: "\n")
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #endif
+        didCopyDebugLog = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            didCopyDebugLog = false
+        }
     }
 }
