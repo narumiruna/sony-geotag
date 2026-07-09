@@ -18,6 +18,9 @@ struct ContentView: View {
                     statusBadge
                 }
             }
+            .onChange(of: locationProvider.currentLocation?.timestamp) { _, _ in
+                cameraManager.sendLocationIfDue()
+            }
         }
     }
 
@@ -29,6 +32,10 @@ struct ContentView: View {
                 LabeledContent("Found", value: discoveredCameraName)
             }
             LabeledContent("Packets sent", value: String(cameraManager.packetsSent))
+            if cameraManager.state == .linked && cameraManager.packetsSent == 0 {
+                Text("Wait for Packets sent > 0 before taking a photo.")
+                    .foregroundStyle(.orange)
+            }
             LabeledContent("DD11 timezone", value: cameraManager.includeTimezone ? "95-byte packet" : "91-byte packet")
             if let dd21ConfigHex = cameraManager.dd21ConfigHex {
                 LabeledContent("DD21", value: dd21ConfigHex)
@@ -69,6 +76,11 @@ struct ContentView: View {
                 }
             }
             .disabled(!cameraManager.canStart)
+
+            Button("Send Location Now") {
+                cameraManager.sendLocationNow()
+            }
+            .disabled(cameraManager.state != .linked)
 
             Button("Stop Location Link", role: .destructive) {
                 cameraManager.stopLink()

@@ -137,9 +137,21 @@ final class CameraBLEManager: NSObject, ObservableObject {
         runNextOperationIfNeeded()
     }
 
+    func sendLocationNow() {
+        sendLocationIfDue(force: true)
+    }
+
+    func sendLocationIfDue(force: Bool = false) {
+        guard state == .linked else { return }
+        if !force, let lastSentAt, Date().timeIntervalSince(lastSentAt) < updateInterval {
+            return
+        }
+        sendLocationOnce()
+    }
+
     private func startSendingLocations() {
         state = .linked
-        appendLog("Location link active")
+        appendLog("Location link active; send photos only after DD11 location OK / Packets sent > 0")
         sendLocationOnce()
         sendTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
             self?.sendLocationOnce()
@@ -152,7 +164,11 @@ final class CameraBLEManager: NSObject, ObservableObject {
             return
         }
         guard let location = locationProvider?() else {
-            appendLog("No GPS fix available yet")
+            appendLog("No GPS fix available yet; waiting for iPhone location")
+            return
+        }
+        guard location.horizontalAccuracy >= 0 else {
+            appendLog("Ignoring invalid GPS fix")
             return
         }
 
@@ -162,6 +178,16 @@ final class CameraBLEManager: NSObject, ObservableObject {
                 longitude: location.coordinate.longitude,
                 date: Date(),
                 includeTimezone: includeTimezone
+            )
+            appendLog(
+                String(
+                    format: "Queue DD11 %.7f, %.7f acc=±%.0fm age=%.0fs bytes=%d",
+                    location.coordinate.latitude,
+                    location.coordinate.longitude,
+                    location.horizontalAccuracy,
+                    Date().timeIntervalSince(location.timestamp),
+                    packet.count
+                )
             )
             enqueueWrite(name: "DD11 location", uuid: SonyProtocol.locationDataWriteUUID, data: packet, required: true)
             runNextOperationIfNeeded()
