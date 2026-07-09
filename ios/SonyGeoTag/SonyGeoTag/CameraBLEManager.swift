@@ -2,6 +2,7 @@ import Combine
 import CoreBluetooth
 import CoreLocation
 import Foundation
+import OSLog
 
 final class CameraBLEManager: NSObject, ObservableObject {
     @Published private(set) var state: CameraConnectionState = .idle
@@ -27,6 +28,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private var operationTimeoutTimer: Timer?
     private var onQueueEmpty: (() -> Void)?
     private let operationTimeout: TimeInterval = 12
+    private let logger = Logger(subsystem: "com.narumi.SonyGeoTag", category: "BLE")
 
     override init() {
         super.init()
@@ -341,7 +343,10 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
     private func appendLog(_ message: String) {
         let timestamp = Date().formatted(date: .omitted, time: .standard)
-        logLines.append("\(timestamp)  \(message)")
+        let line = "\(timestamp)  \(message)"
+        logLines.append(line)
+        print(line)
+        logger.info("\(line, privacy: .public)")
         if logLines.count > 120 {
             logLines.removeFirst(logLines.count - 120)
         }
@@ -352,11 +357,16 @@ final class CameraBLEManager: NSObject, ObservableObject {
     }
 
     private func normalized(_ uuid: String) -> String {
-        uuid.lowercased()
+        let lowercased = uuid.lowercased()
+        let bluetoothBaseSuffix = "-0000-1000-8000-00805f9b34fb"
+        if lowercased.hasPrefix("0000"), lowercased.hasSuffix(bluetoothBaseSuffix) {
+            return String(lowercased.dropFirst(4).prefix(4))
+        }
+        return lowercased
     }
 
     private func normalized(_ uuid: CBUUID) -> String {
-        uuid.uuidString.lowercased()
+        normalized(uuid.uuidString)
     }
 }
 
