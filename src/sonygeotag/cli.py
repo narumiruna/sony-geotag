@@ -19,6 +19,9 @@ from sonygeotag.ble_probe import normalize_characteristic_filters
 from sonygeotag.ble_probe import normalize_targets
 from sonygeotag.ble_probe import read_gatt_values
 from sonygeotag.ble_probe import scan_devices
+from sonygeotag.sony_location import SonyLocationSyncRun
+from sonygeotag.sony_location import create_location_packet
+from sonygeotag.sony_location import sync_location
 
 app = typer.Typer(help="Sony Alpha BLE geotag protocol probe tools.")
 
@@ -46,6 +49,7 @@ CharacteristicOption = Annotated[
 JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
 TextOption = Annotated[bool, typer.Option("--text", help="Print human-readable text instead of JSONL.")]
 PairOption = Annotated[bool, typer.Option("--pair", help="Ask Bleak/OS to pair before GATT access.")]
+NoTimezoneOption = Annotated[bool, typer.Option("--no-timezone", help="Omit DD11 timezone/DST bytes.")]
 
 
 @app.command()
@@ -160,6 +164,72 @@ def notify_log(
         raise typer.Exit(code=2)
 
     _print_notification_summary(result=result, duration=duration)
+
+
+@app.command("encode-location")
+def encode_location(
+    latitude: Annotated[float, typer.Option("--lat", min=-90.0, max=90.0, help="Latitude in degrees.")],
+    longitude: Annotated[float, typer.Option("--lon", min=-180.0, max=180.0, help="Longitude in degrees.")],
+    no_timezone: NoTimezoneOption = False,
+) -> None:
+    """Encode a Sony DD11 location packet without touching BLE."""
+    packet = create_location_packet(latitude=latitude, longitude=longitude, include_timezone=not no_timezone)
+    typer.echo(bytes_to_hex(packet))
+
+
+@app.command("send-location")
+def send_location(
+    latitude: Annotated[float, typer.Option("--lat", min=-90.0, max=90.0, help="Latitude in degrees.")],
+    longitude: Annotated[float, typer.Option("--lon", min=-180.0, max=180.0, help="Longitude in degrees.")],
+    duration: DurationOption = 60.0,
+    interval: Annotated[float, typer.Option("--interval", "-i", min=1.0, help="Seconds between DD11 writes.")] = 30.0,
+    timeout: TimeoutOption = 10.0,
+    connect_timeout: ConnectTimeoutOption = 30.0,
+    target: TargetOption = None,
+    json_output: JsonOption = False,
+    pair: PairOption = False,
+    vendor_pair_init: Annotated[
+        bool,
+        typer.Option("--vendor-pair-init", help="Write Sony EE01 vendor pairing-init payload before DD30/DD31."),
+    ] = False,
+    write: Annotated[bool, typer.Option("--write", help="Actually write to the camera. Omit for dry-run.")] = False,
+    no_timezone: NoTimezoneOption = False,
+    no_unlock: Annotated[bool, typer.Option("--no-unlock", help="Leave DD30/DD31 enabled on exit.")] = False,
+) -> None:
+    """Send a GPS location to the camera using the Sony DD30/DD31/DD11 flow."""
+    if not write:
+        packet = create_location_packet(latitude=latitude, longitude=longitude, include_timezone=not no_timezone)
+        typer.echo("Dry-run only; add --write to touch the camera.")
+        typer.echo(bytes_to_hex(packet))
+        return
+
+    targets = normalize_targets(target)
+    result = asyncio.run(
+        sync_location(
+            targets=targets,
+            scan_timeout=timeout,
+            connect_timeout=connect_timeout,
+            latitude=latitude,
+            longitude=longitude,
+            duration=duration,
+            interval=interval,
+            pair=pair,
+            vendor_pair_init=vendor_pair_init,
+            include_timezone=False if no_timezone else None,
+            unlock=not no_unlock,
+        )
+    )
+    if result is None:
+        typer.echo(f"No target found. Targets: {', '.join(targets)}", err=True)
+        raise typer.Exit(code=1)
+
+    if json_output:
+        typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        _print_location_sync_text(result)
+
+    if not result.success:
+        raise typer.Exit(code=3)
 
 
 def _run_gatt_dump(
@@ -277,6 +347,33 @@ def _print_notification_summary(result: NotificationRun, duration: float) -> Non
         for subscription_error in result.subscription_errors:
             characteristic = subscription_error.characteristic
             typer.echo(f"- {characteristic.uuid} handle={characteristic.handle}: {subscription_error.error}", err=True)
+
+
+def _print_location_sync_text(result: SonyLocationSyncRun) -> None:
+    device = result.device
+    typer.echo(f"Device: {device.name or device.local_name or '<unnamed>'} address={device.address} rssi={device.rssi}")
+    if result.advertisement is not None:
+        typer.echo(
+            "Sony advertisement: "
+            f"camera={result.advertisement.is_camera} "
+            f"protocol_version={result.advertisement.protocol_version} "
+            f"requires_unlock={result.advertisement.requires_unlock}"
+        )
+    typer.echo(f"Location sync: success={result.success} packets_sent={result.packets_sent}")
+    typer.echo(f"DD11 include_timezone={result.include_timezone}")
+
+    typer.echo("Operations:")
+    for operation in result.operations:
+        status = "OK" if operation.error is None else f"ERROR {operation.error}"
+        value_len = len(operation.value) if operation.value is not None else 0
+        typer.echo(f"- {operation.name} {operation.direction} {operation.uuid} len={value_len} {status}")
+        if operation.value is not None and (operation.error is not None or operation.name == "write_dd11_location"):
+            typer.echo(f"  value={bytes_to_hex(operation.value)}")
+
+    if result.notifications:
+        typer.echo("DD01 notifications:")
+        for event in result.notifications:
+            typer.echo(f"- {event.timestamp} len={len(event.data)} data={bytes_to_hex(event.data)}")
 
 
 def _filters_label(filters: tuple[str, ...]) -> str:

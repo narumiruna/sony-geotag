@@ -36,6 +36,19 @@ uv run sonygeotag notify-log --target ILCE-7CM2 --duration 30 --pair
 uv run sonygeotag notify-log --target ILCE-7CM2 --characteristic cc03 --text
 ```
 
+Encode a Sony `DD11` GPS packet without touching BLE:
+
+```bash
+uv run sonygeotag encode-location --lat 35.681236 --lon 139.767125
+```
+
+Send GPS to the camera. This is dry-run unless `--write` is present:
+
+```bash
+uv run sonygeotag send-location --lat 35.681236 --lon 139.767125
+uv run sonygeotag send-location --lat 35.681236 --lon 139.767125 --write --duration 60
+```
+
 JSON output for logs/diffs:
 
 ```bash
@@ -45,7 +58,7 @@ uv run sonygeotag read-values --json > read-values.json
 uv run sonygeotag notify-log --duration 60 > notify-log.jsonl
 ```
 
-These commands are read-only except for the BLE connection/subscription behavior performed by the OS/Bleak while discovering GATT metadata and enabling notifications. Do not add write probes until the packet format is understood.
+Most probe commands are read-only except for BLE connection/subscription behavior. `send-location --write` performs the known Sony DD30/DD31/DD11 location flow and writes GPS data to the camera.
 
 ## Notes
 
