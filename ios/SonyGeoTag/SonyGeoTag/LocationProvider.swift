@@ -24,7 +24,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         manager.pausesLocationUpdatesAutomatically = false
         #if os(iOS)
         manager.allowsBackgroundLocationUpdates = false
-        manager.showsBackgroundLocationIndicator = true
+        manager.showsBackgroundLocationIndicator = false
         #endif
     }
 
@@ -136,7 +136,9 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     private func applyLocationSettings() {
         #if os(iOS)
         manager.allowsBackgroundLocationUpdates = backgroundLinkEnabled
-        manager.showsBackgroundLocationIndicator = backgroundLinkEnabled
+        // Keep the iOS background-location blue indicator hidden while still allowing
+        // background updates when Background Link is enabled.
+        manager.showsBackgroundLocationIndicator = false
         #endif
 
         if lowPowerModeEnabled || !isForeground {
