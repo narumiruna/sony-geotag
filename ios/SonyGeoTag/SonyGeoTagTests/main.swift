@@ -32,6 +32,49 @@ require(packet[6..<11] == Data([0x00, 0x00, 0x10, 0x10, 0x10]), "DD11 padding sh
 require(packet[19..<26] == Data([0x07, 0xEA, 0x07, 0x09, 0x11, 0x22, 0x38]), "DD11 timestamp should be UTC")
 require(packet[91..<95] == Data([0x00, 0xB4, 0x00, 0x00]), "DD11 timezone should be +180 minutes, no DST")
 
+require(
+    LocationBackgroundPolicy.allowsBackgroundLocationUpdates(
+        backgroundLinkEnabled: true,
+        authorizationScope: .always
+    ),
+    "Background Link should enable background updates only with Always authorization"
+)
+require(
+    !LocationBackgroundPolicy.allowsBackgroundLocationUpdates(
+        backgroundLinkEnabled: true,
+        authorizationScope: .whenInUse
+    ),
+    "Background Link must stay foreground-only with When-In-Use authorization to avoid the blue indicator"
+)
+require(
+    !LocationBackgroundPolicy.allowsBackgroundLocationUpdates(
+        backgroundLinkEnabled: false,
+        authorizationScope: .always
+    ),
+    "Disabled Background Link must not enable background updates"
+)
+require(
+    !LocationBackgroundPolicy.canRunLocationServices(
+        isForeground: false,
+        allowsBackgroundLocationUpdates: false
+    ),
+    "Location services should pause in the background when background updates are not allowed"
+)
+require(
+    LocationBackgroundPolicy.requiresAlwaysAuthorizationWarning(
+        backgroundLinkEnabled: true,
+        authorizationScope: .whenInUse
+    ),
+    "When-In-Use authorization should keep the Always-permission warning visible for Background Link"
+)
+require(
+    !LocationBackgroundPolicy.requiresAlwaysAuthorizationWarning(
+        backgroundLinkEnabled: true,
+        authorizationScope: .always
+    ),
+    "Always authorization should not show the Always-permission warning"
+)
+
 let noTimezonePacket = try SonyProtocol.encodeLocationPacket(
     latitude: -33.5,
     longitude: 151.2,
@@ -42,4 +85,4 @@ let noTimezonePacket = try SonyProtocol.encodeLocationPacket(
 require(noTimezonePacket.count == 91, "Non-timezone DD11 packet should be 91 bytes")
 require(noTimezonePacket.prefix(6) == Data([0x00, 0x59, 0x08, 0x02, 0xFC, 0x00]), "91-byte DD11 header should match")
 
-print("SonyProtocol smoke test passed")
+print("iOS smoke test passed")

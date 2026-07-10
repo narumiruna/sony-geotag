@@ -1,6 +1,38 @@
 import CoreLocation
 import Foundation
 
+enum LocationAuthorizationScope {
+    case notDetermined
+    case restricted
+    case denied
+    case whenInUse
+    case always
+    case unknown
+}
+
+enum LocationBackgroundPolicy {
+    static func allowsBackgroundLocationUpdates(
+        backgroundLinkEnabled: Bool,
+        authorizationScope: LocationAuthorizationScope
+    ) -> Bool {
+        backgroundLinkEnabled && authorizationScope == .always
+    }
+
+    static func canRunLocationServices(
+        isForeground: Bool,
+        allowsBackgroundLocationUpdates: Bool
+    ) -> Bool {
+        isForeground || allowsBackgroundLocationUpdates
+    }
+
+    static func requiresAlwaysAuthorizationWarning(
+        backgroundLinkEnabled: Bool,
+        authorizationScope: LocationAuthorizationScope
+    ) -> Bool {
+        backgroundLinkEnabled && authorizationScope == .whenInUse
+    }
+}
+
 final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var currentLocation: CLLocation?
@@ -9,6 +41,8 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var updateModeLabel = "Stopped"
 
     var onLocationUpdate: ((CLLocation) -> Void)?
+
+    private static let backgroundLinkNeedsAlwaysMessage = "Background Link needs Always Location permission for reliable background updates."
 
     private let manager = CLLocationManager()
     private var backgroundLinkEnabled = false
@@ -61,12 +95,44 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         return String(format: "±%.0f m", currentLocation.horizontalAccuracy)
     }
 
-    private var isLocationAuthorized: Bool {
+    private var authorizationScope: LocationAuthorizationScope {
+        switch authorizationStatus {
+        case .notDetermined:
+            .notDetermined
+        case .restricted:
+            .restricted
+        case .denied:
+            .denied
+        case .authorizedAlways:
+            .always
         #if os(iOS)
-        authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse
-        #else
-        authorizationStatus == .authorizedAlways
+        case .authorizedWhenInUse:
+            .whenInUse
         #endif
+        @unknown default:
+            .unknown
+        }
+    }
+
+    private var isLocationAuthorized: Bool {
+        authorizationScope == .always || authorizationScope == .whenInUse
+    }
+
+    private var allowsBackgroundLocationUpdates: Bool {
+        LocationBackgroundPolicy.allowsBackgroundLocationUpdates(
+            backgroundLinkEnabled: backgroundLinkEnabled,
+            authorizationScope: authorizationScope
+        )
+    }
+
+    private var backgroundLinkPermissionWarning: String? {
+        guard LocationBackgroundPolicy.requiresAlwaysAuthorizationWarning(
+            backgroundLinkEnabled: backgroundLinkEnabled,
+            authorizationScope: authorizationScope
+        ) else {
+            return nil
+        }
+        return Self.backgroundLinkNeedsAlwaysMessage
     }
 
     func configure(backgroundLinkEnabled: Bool, lowPowerModeEnabled: Bool, isForeground: Bool) {
@@ -74,6 +140,10 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         self.lowPowerModeEnabled = lowPowerModeEnabled
         self.isForeground = isForeground
         applyLocationSettings()
+        if isUpdating {
+            startLocationServices()
+        }
+        refreshBackgroundPermissionWarning()
     }
 
     func requestAuthorization(preferAlways: Bool = false) {
@@ -111,9 +181,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         #if os(iOS)
         case .authorizedWhenInUse:
             isUpdating = true
-            lastError = backgroundLinkEnabled
-                ? "Background Link needs Always Location permission for reliable background updates."
-                : nil
+            lastError = backgroundLinkPermissionWarning
             applyLocationSettings()
             startLocationServices()
         #endif
@@ -131,17 +199,31 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         updateModeLabel = "Stopped"
         manager.stopUpdatingLocation()
         manager.stopMonitoringSignificantLocationChanges()
+        #if os(iOS)
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
+        #endif
     }
 
     private func applyLocationSettings() {
+        let allowBackgroundUpdates = allowsBackgroundLocationUpdates
+
         #if os(iOS)
-        manager.allowsBackgroundLocationUpdates = backgroundLinkEnabled
-        // Keep the iOS background-location blue indicator hidden while still allowing
-        // background updates when Background Link is enabled.
+        // Only Always authorization can hide the background-location blue indicator
+        // reliably. With When-In-Use authorization, keep updates foreground-only.
+        manager.allowsBackgroundLocationUpdates = allowBackgroundUpdates
         manager.showsBackgroundLocationIndicator = false
         #endif
 
-        if lowPowerModeEnabled || !isForeground {
+        if isUpdating,
+           !LocationBackgroundPolicy.canRunLocationServices(
+               isForeground: isForeground,
+               allowsBackgroundLocationUpdates: allowBackgroundUpdates
+           ) {
+            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            manager.distanceFilter = 50
+            updateModeLabel = "Paused in background"
+        } else if lowPowerModeEnabled || !isForeground {
             manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
             manager.distanceFilter = 50
             updateModeLabel = isUpdating ? "Low power / significant changes" : "Low power ready"
@@ -153,12 +235,31 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     private func startLocationServices() {
-        if backgroundLinkEnabled || lowPowerModeEnabled {
+        let allowBackgroundUpdates = allowsBackgroundLocationUpdates
+        guard LocationBackgroundPolicy.canRunLocationServices(
+            isForeground: isForeground,
+            allowsBackgroundLocationUpdates: allowBackgroundUpdates
+        ) else {
+            manager.stopUpdatingLocation()
+            manager.stopMonitoringSignificantLocationChanges()
+            updateModeLabel = "Paused in background"
+            return
+        }
+
+        if allowBackgroundUpdates || lowPowerModeEnabled {
             manager.startMonitoringSignificantLocationChanges()
         } else {
             manager.stopMonitoringSignificantLocationChanges()
         }
         manager.startUpdatingLocation()
+    }
+
+    private func refreshBackgroundPermissionWarning(clearResolvedErrors: Bool = false) {
+        if let warning = backgroundLinkPermissionWarning {
+            lastError = warning
+        } else if clearResolvedErrors || lastError == Self.backgroundLinkNeedsAlwaysMessage {
+            lastError = nil
+        }
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -170,13 +271,18 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         #endif
         if isLocationAuthorized {
             startUpdating()
+        } else if authorizationStatus == .denied || authorizationStatus == .restricted {
+            stopUpdating()
+            lastError = "Location permission is not available."
+        } else {
+            applyLocationSettings()
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         currentLocation = location
-        lastError = nil
+        refreshBackgroundPermissionWarning(clearResolvedErrors: true)
         onLocationUpdate?(location)
     }
 

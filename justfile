@@ -4,7 +4,7 @@ xcode_dev_dir := "/Applications/Xcode.app/Contents/Developer"
 ios_project := "ios/SonyGeoTag/SonyGeoTag.xcodeproj"
 ios_target := "SonyGeoTag"
 ios_scheme := "SonyGeoTag"
-protocol_smoke := "/tmp/SonyProtocolSmoke"
+ios_smoke := "/tmp/SonyGeoTagSmoke"
 
 [default]
 all: check
@@ -47,10 +47,10 @@ py-check: lint-check type test
 ios-open:
     open {{ios_project}}
 
-# Run the Swift DD11 protocol smoke test
+# Run the Swift DD11 protocol and location policy smoke test
 ios-smoke:
-    swiftc ios/SonyGeoTag/SonyGeoTag/SonyProtocol.swift ios/SonyGeoTag/SonyGeoTagTests/main.swift -o {{protocol_smoke}}
-    {{protocol_smoke}}
+    swiftc ios/SonyGeoTag/SonyGeoTag/SonyProtocol.swift ios/SonyGeoTag/SonyGeoTag/LocationProvider.swift ios/SonyGeoTag/SonyGeoTagTests/main.swift -o {{ios_smoke}}
+    {{ios_smoke}}
 
 # Type check all Swift sources
 ios-typecheck:
@@ -102,7 +102,7 @@ location-write lat lon target="ILCE-7CM2" duration="60" interval="30":
 
 # Remove local build/test artifacts
 clean:
-    rm -rf ios/SonyGeoTag/build .pytest_cache .ruff_cache .coverage htmlcov {{protocol_smoke}}
+    rm -rf ios/SonyGeoTag/build .pytest_cache .ruff_cache .coverage htmlcov {{ios_smoke}}
 
 # Build and publish the package to PyPI
 publish:

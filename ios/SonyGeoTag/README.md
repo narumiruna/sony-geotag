@@ -57,6 +57,7 @@ The camera does not ask the app for GPS right before shutter release. Instead, S
 - High accuracy / foreground shooting: best GPS accuracy and a 30-second DD11 interval.
 - Low Power Mode: lower CoreLocation accuracy, significant-location-change monitoring, and a 120-second DD11 interval.
 - Background Link: asks for Always Location permission, remembers the last camera peripheral, enables CoreBluetooth restoration, and arms a pending CoreBluetooth reconnect so iOS can wake the app when the remembered camera returns.
+- If Background Link only has When-In-Use permission, GPS stays foreground-only so iOS does not need to show the blue background-location indicator.
 - Background App Refresh: registers a `BGAppRefreshTask` as a best-effort maintenance wake-up to reschedule and attempt reconnect/location delivery.
 
 Limitations:
