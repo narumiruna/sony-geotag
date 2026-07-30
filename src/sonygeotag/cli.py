@@ -19,6 +19,9 @@ from sonygeotag.ble_probe import normalize_characteristic_filters
 from sonygeotag.ble_probe import normalize_targets
 from sonygeotag.ble_probe import read_gatt_values
 from sonygeotag.ble_probe import scan_devices
+from sonygeotag.camera_snapshot import CameraInfoSessionError
+from sonygeotag.camera_snapshot import capture_camera_info
+from sonygeotag.sony_info import CameraInfoSnapshot
 from sonygeotag.sony_location import SonyLocationSyncRun
 from sonygeotag.sony_location import create_location_packet
 from sonygeotag.sony_location import sync_location
@@ -47,6 +50,17 @@ CharacteristicOption = Annotated[
     ),
 ]
 JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
+IncludeRawOption = Annotated[
+    bool,
+    typer.Option("--include-raw", help="Include public raw hex; sensitive and unknown raw remains redacted."),
+]
+ShowSensitiveOption = Annotated[
+    bool,
+    typer.Option(
+        "--show-sensitive",
+        help="Reveal sensitive decoded values; pair with --include-raw to reveal sensitive or unknown raw.",
+    ),
+]
 TextOption = Annotated[bool, typer.Option("--text", help="Print human-readable text instead of JSONL.")]
 PairOption = Annotated[bool, typer.Option("--pair", help="Ask Bleak/OS to pair before GATT access.")]
 NoTimezoneOption = Annotated[bool, typer.Option("--no-timezone", help="Omit DD11 timezone/DST bytes.")]
@@ -123,6 +137,49 @@ def read_values(
         return
 
     _print_read_dump_text(result)
+
+
+@app.command("camera-info")
+def camera_info(
+    timeout: TimeoutOption = 10.0,
+    connect_timeout: ConnectTimeoutOption = 25.0,
+    target: TargetOption = None,
+    json_output: JsonOption = False,
+    include_raw: IncludeRawOption = False,
+    show_sensitive: ShowSensitiveOption = False,
+    pair: PairOption = False,
+) -> None:
+    """Capture a strict read-only snapshot of all readable Sony camera information."""
+    targets = normalize_targets(target)
+    try:
+        result = asyncio.run(
+            capture_camera_info(
+                targets=targets,
+                scan_timeout=timeout,
+                connect_timeout=connect_timeout,
+                pair=pair,
+            )
+        )
+    except CameraInfoSessionError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=2) from error
+
+    if result is None:
+        typer.echo(f"No target found. Targets: {', '.join(targets)}", err=True)
+        raise typer.Exit(code=1)
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                result.to_dict(include_raw=include_raw, show_sensitive=show_sensitive),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return
+
+    _print_camera_info_text(result, include_raw=include_raw, show_sensitive=show_sensitive)
 
 
 @app.command("notify-log")
@@ -325,6 +382,75 @@ def _print_read_dump_text(result: ReadDump) -> None:
             typer.echo(f"READ {characteristic.uuid} handle={characteristic.handle} len={value_len} value={payload}")
         else:
             typer.echo(f"READ {characteristic.uuid} handle={characteristic.handle} ERROR {value.error}")
+
+
+def _print_camera_info_text(
+    result: CameraInfoSnapshot,
+    *,
+    include_raw: bool,
+    show_sensitive: bool,
+) -> None:
+    device = result.device.to_dict(show_sensitive=show_sensitive)
+    address = device["address"] if device["address"] is not None else "[REDACTED]"
+    name = result.device.name or result.device.local_name or "<unnamed>"
+    typer.echo("Strict read-only Sony camera information snapshot")
+    typer.echo(f"Captured: {result.captured_at}")
+    typer.echo(f"Device: name={name!r} address={address} rssi={result.device.rssi}")
+    if result.advertisement is not None:
+        typer.echo(
+            "Advertisement: "
+            f"camera={result.advertisement.get('is_camera')} "
+            f"protocol_version={result.advertisement.get('protocol_version')} "
+            f"requires_unlock={result.advertisement.get('requires_unlock')}"
+        )
+
+    category_labels = {
+        "identity": "Identity",
+        "battery": "Battery",
+        "storage": "Storage",
+        "camera_status": "Camera Status",
+        "network": "Network",
+        "location": "Location",
+        "pairing": "Pairing",
+        "camera_control": "Unknown Camera Control Protocol",
+        "remote": "Remote Protocol",
+        "protocol": "Unknown Protocol",
+        "unknown": "Unknown Protocol",
+    }
+    category_order = tuple(category_labels)
+    grouped = {
+        category: [item for item in result.characteristics if item.category == category]
+        for category in category_order
+    }
+    extra_categories = sorted({item.category for item in result.characteristics} - set(category_order))
+    for category in (*category_order, *extra_categories):
+        items = grouped.get(category) or [item for item in result.characteristics if item.category == category]
+        if not items:
+            continue
+        typer.echo(f"\n{category_labels.get(category, category.replace('_', ' ').title())}:")
+        for item in items:
+            serialized = item.to_dict(include_raw=include_raw, show_sensitive=show_sensitive)
+            status = serialized["status"]
+            confidence = serialized["confidence"]
+            if serialized["redacted"]:
+                fields_text = "[REDACTED]"
+            elif serialized["fields"]:
+                fields_text = json.dumps(serialized["fields"], ensure_ascii=False, sort_keys=True)
+            else:
+                fields_text = "{}"
+            typer.echo(f"- {item.name} ({item.uuid}) status={status} confidence={confidence} fields={fields_text}")
+            if serialized["raw_hex"] is not None:
+                typer.echo(f"  raw={serialized['raw_hex']}")
+            if item.warning is not None:
+                typer.echo(f"  warning={item.warning}")
+            if item.error is not None:
+                typer.echo(f"  error={item.error}")
+
+    counts = result.to_dict(include_raw=False, show_sensitive=False)["counts"]
+    typer.echo(
+        "\nResults: "
+        + ", ".join(f"{status}={count}" for status, count in counts.items())
+    )
 
 
 def _print_notification_event(event: NotificationEvent, text: bool) -> None:

@@ -18,9 +18,39 @@ uv run sonygeotag scan --target ILCE-7CM2 --timeout 15
 uv run sonygeotag gatt-dump --target ILCE-7CM2 --timeout 10
 uv run sonygeotag read-values --target ILCE-7CM2 --pair --json > logs/read-values.json
 uv run sonygeotag notify-log --target ILCE-7CM2 --duration 60 --pair > logs/notify-log.jsonl
+uv run sonygeotag camera-info --target ILCE-7CM2 --pair
+uv run sonygeotag camera-info --target ILCE-7CM2 --pair --json > camera-info.json
 ```
 
 Use `--json` when saving scan/GATT/read data for diffs. `notify-log` streams JSONL by default so each notification packet is one line. If reads/subscriptions fail with insufficient authentication/encryption, retry with `--pair` and accept the camera pairing prompt.
+
+## Strict read-only camera snapshot
+
+`camera-info` uses one BLE session and is limited to scan/connect, service discovery, `read_gatt_char`, and disconnect. It does not call `write_gatt_char`, `start_notify`, or `stop_notify`; it never activates camera Wi-Fi or writes location, remote-control, pairing-init, or other Sony commands.
+
+The schema-v1 JSON result keeps decoding status separate from confidence:
+
+- status: `decoded`, `partial`, `unknown`, `unavailable`, or `error`
+- confidence: `verified`, `referenced`, `tentative`, or `unknown`
+- state-dependent GATT errors such as `0x90`, `0x9D`, insufficient encryption, and timeout are per-characteristic `unavailable` results
+- unknown payloads remain uninterpreted and are treated as sensitive
+
+CoreBluetooth addresses, SSID/BSSID/password, FTP profile names, opaque identifiers, and unknown payloads are redacted by default. `--include-raw` adds public raw bytes; unknown or sensitive raw bytes require both `--include-raw --show-sensitive`. Do not publish or commit unredacted captures.
+
+Current decoder coverage:
+
+| UUID | Information | Confidence | Notes |
+| --- | --- | --- | --- |
+| `CC0A`, `CC0B`, `CC11` | firmware and camera model | verified | A7C II fixtures decode as firmware `2.01`, model `ILCE-7CM2` |
+| `CC03` | push-transfer readiness | referenced | current state only; no notification subscription |
+| `CC09` | Wi-Fi, transfer, remote, time, streaming, and recording states | referenced | unknown and duplicate TLV tags are retained numerically |
+| `CC0F` | primary media status and remaining capacity | tentative | only the evidence-backed primary prefix is labeled; trailing bytes remain partial |
+| `CC10` | battery packs, percentage, level code, and external-power state | referenced | truncated/unknown pack layouts remain partial |
+| `CC06`, `CC07`, `CC0C` | SSID, password, BSSID | referenced | sensitive and state-dependent; the command never starts Wi-Fi |
+| `CC40` | FTP profile names | referenced | sensitive |
+| `CCAB` | Wi-Fi band/status code | referenced | code retained numerically until its A7C II mapping is verified |
+| `DD21`, `DD30`-`DD33` | location packet capability and session flags | verified | read-only; `DD11` is never written |
+| `EE02`, `EE04`, other `BBxx`/`CCxx` | framing/opaque vendor data | unknown | no semantic guess; sensitive raw opt-in only |
 
 ## Observed primary services
 
@@ -107,8 +137,9 @@ uv run sonygeotag send-location --lat 35.681236 --lon 139.767125 --write --durat
 
 - `scan` finds `ILCE-7CM2` reliably with Sony manufacturer data.
 - `gatt-dump` found 5 Sony vendor services and 107 characteristics.
-- `read-values` without completed pairing/bonding found 45 readable characteristics, but all failed with insufficient authentication/encryption or timeout.
-- `notify-log` can subscribe to all 20 notify characteristics without writing. No notifications were emitted during idle/manual camera operation, so location sync likely requires the DD30/DD31/DD11 flow.
+- `read-values` found 45 readable characteristics. Without completed pairing/bonding they failed with insufficient authentication/encryption or timeout; after pairing, a representative snapshot returned 33 values and 12 state-dependent `0x90`/`0x9D` errors.
+- `camera-info` decodes known values while preserving all 45 readable results and redacting sensitive/unknown payloads by default.
+- `notify-log` can subscribe to all 20 notify characteristics without Sony application-data writes, though BLE notification subscription configures CCCDs. No notifications were emitted during idle/manual camera operation, so location sync likely requires the DD30/DD31/DD11 flow.
 - `send-location --write --pair --vendor-pair-init` succeeded after putting the camera in Bluetooth pairing mode.
 - Successful A7C II write details:
   - advertisement protocol version: `0x65` / `101`, unlock required
@@ -135,4 +166,4 @@ uv run sonygeotag send-location --lat 35.681236 --lon 139.767125 --write --durat
 
 ## Safety rule
 
-Do not write arbitrary payloads to the camera. Only use documented Sony payloads, and keep write commands explicit via `--write`.
+`camera-info` must remain strict read-only: no application-level GATT writes and no notification subscriptions. Do not write arbitrary payloads to the camera. Only use documented Sony payloads, and keep location writes explicit via `--write`.
