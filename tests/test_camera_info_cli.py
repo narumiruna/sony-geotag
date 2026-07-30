@@ -1,4 +1,5 @@
 import json
+import re
 
 from typer.testing import CliRunner
 
@@ -9,6 +10,7 @@ from sonygeotag.sony_info import decode_characteristic
 
 runner = CliRunner()
 CAMERA_CONTROL_SERVICE = "8000cc00-cc00-ffff-ffff-ffffffffffff"
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def sample_snapshot() -> CameraInfoSnapshot:
@@ -53,10 +55,11 @@ def test_camera_info_help_preserves_grouped_cli_grammar() -> None:
     result = runner.invoke(cli.app, ["camera-info", "--help"])
 
     assert result.exit_code == 0
-    assert "strict read-only" in result.stdout.lower()
-    assert "--include-raw" in result.stdout
-    assert "--show-sensitive" in result.stdout
-    assert "--pair" in result.stdout
+    help_text = ANSI_ESCAPE.sub("", result.stdout)
+    assert "strict read-only" in help_text.lower()
+    assert "--include-raw" in help_text
+    assert "--show-sensitive" in help_text
+    assert "--pair" in help_text
 
 
 def test_camera_info_text_groups_summary_and_redacts_sensitive_values(monkeypatch) -> None:
