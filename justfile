@@ -88,6 +88,10 @@ ble-scan target="ILCE-7CM2":
 ble-gatt target="ILCE-7CM2":
     uv run sonygeotag gatt-dump --target {{target}} --timeout 10
 
+# Decode a strict read-only camera information snapshot
+ble-info target="ILCE-7CM2":
+    uv run sonygeotag camera-info --target {{target}} --timeout 15 --pair
+
 # Subscribe to notifications from the camera
 ble-notify target="ILCE-7CM2" duration="60":
     uv run sonygeotag notify-log --target {{target}} --duration {{duration}}
