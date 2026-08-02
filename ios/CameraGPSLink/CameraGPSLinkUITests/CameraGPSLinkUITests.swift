@@ -1,6 +1,6 @@
 import XCTest
 
-final class SonyGeoTagUITests: XCTestCase {
+final class CameraGPSLinkUITests: XCTestCase {
     private var app: XCUIApplication!
 
     override func tearDown() {

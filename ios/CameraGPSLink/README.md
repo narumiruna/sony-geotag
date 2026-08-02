@@ -39,7 +39,7 @@ Open **Link Settings** from the home screen. Changes are staged until **Apply**;
 
 The Effect Preview describes the concrete permission, accuracy, frequency, and battery consequences before Apply. Both choices are applied together. If application fails, the previous valid settings remain active.
 
-Within the current app identity, updates keep the same stored behavior: Background defaults off, Battery Saver defaults on, and the remembered CoreBluetooth peripheral remains unchanged. The bundle identifier changed from the earlier development identifier `com.narumi.SonyGeoTag` to `dev.narumi.cameragpslink`; iOS treats those as separate apps, so sandboxed settings from an older development install do not migrate automatically.
+Within the current app identity, updates keep the same stored behavior: Background defaults off, Battery Saver defaults on, and the remembered CoreBluetooth peripheral remains unchanged. The bundle identifier changed from an earlier development identity to `dev.narumi.cameragpslink`; iOS treats those as separate apps, so sandboxed settings from an older development install do not migrate automatically.
 
 ## Permission and partial states
 

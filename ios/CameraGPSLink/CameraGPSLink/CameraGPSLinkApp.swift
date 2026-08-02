@@ -1,12 +1,12 @@
 import SwiftUI
 
 @main
-struct SonyGeoTagApp: App {
+struct CameraGPSLinkApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var appModel: SonyGeoTagAppModel
+    @StateObject private var appModel: CameraGPSLinkAppModel
 
     init() {
-        _appModel = StateObject(wrappedValue: SonyGeoTagAppModel.makeForCurrentProcess())
+        _appModel = StateObject(wrappedValue: CameraGPSLinkAppModel.makeForCurrentProcess())
     }
 
     var body: some Scene {

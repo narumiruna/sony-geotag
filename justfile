@@ -1,11 +1,11 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 xcode_dev_dir := "/Applications/Xcode.app/Contents/Developer"
-ios_project := "ios/SonyGeoTag/SonyGeoTag.xcodeproj"
-ios_target := "SonyGeoTag"
-ios_scheme := "SonyGeoTag"
-ios_smoke := "/tmp/SonyGeoTagSmoke"
-ios_test_device_name := "SonyGeoTag Tests"
+ios_project := "ios/CameraGPSLink/CameraGPSLink.xcodeproj"
+ios_target := "CameraGPSLink"
+ios_scheme := "CameraGPSLink"
+ios_smoke := "/tmp/CameraGPSLinkSmoke"
+ios_test_device_name := "CameraGPSLink Tests"
 ios_test_destination := "platform=iOS Simulator,name=" + ios_test_device_name + ",OS=latest"
 
 [default]
@@ -51,17 +51,17 @@ ios-open:
 
 # Run the Swift DD11 protocol and location policy smoke test
 ios-smoke:
-    swiftc ios/SonyGeoTag/SonyGeoTag/SonyProtocol.swift ios/SonyGeoTag/SonyGeoTag/LocationProvider.swift ios/SonyGeoTag/SonyGeoTagTests/main.swift -o {{ios_smoke}}
+    swiftc ios/CameraGPSLink/CameraGPSLink/SonyProtocol.swift ios/CameraGPSLink/CameraGPSLink/LocationProvider.swift ios/CameraGPSLink/CameraGPSLinkTests/main.swift -o {{ios_smoke}}
     {{ios_smoke}}
 
 # Type check all Swift sources
 ios-typecheck:
-    swiftc -typecheck ios/SonyGeoTag/SonyGeoTag/*.swift
+    swiftc -typecheck ios/CameraGPSLink/CameraGPSLink/*.swift
 
 # Lint iOS plist/project XML files
 ios-lint-project:
-    plutil -lint ios/SonyGeoTag/SonyGeoTag/Info.plist ios/SonyGeoTag/SonyGeoTag.xcodeproj/project.pbxproj
-    xmllint --noout ios/SonyGeoTag/SonyGeoTag.xcodeproj/xcshareddata/xcschemes/SonyGeoTag.xcscheme
+    plutil -lint ios/CameraGPSLink/CameraGPSLink/Info.plist ios/CameraGPSLink/CameraGPSLink.xcodeproj/project.pbxproj
+    xmllint --noout ios/CameraGPSLink/CameraGPSLink.xcodeproj/xcshareddata/xcschemes/CameraGPSLink.xcscheme
 
 # Build the iOS target for Simulator
 ios-build-sim:
@@ -83,12 +83,12 @@ ios-test-prepare:
 # Run the iOS XCTest unit suite
 [no-exit-message]
 ios-unit-test: ios-test-prepare
-    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:SonyGeoTagUnitTests
+    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:CameraGPSLinkUnitTests
 
 # Run the iOS XCUITest suite
 [no-exit-message]
 ios-ui-test: ios-test-prepare
-    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:SonyGeoTagUITests
+    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:CameraGPSLinkUITests
 
 # Run all iOS XCTest suites
 [no-exit-message]
@@ -132,7 +132,7 @@ location-write lat lon target="ILCE-7CM2" duration="60" interval="30":
 
 # Remove local build/test artifacts
 clean:
-    rm -rf ios/SonyGeoTag/build .pytest_cache .ruff_cache .coverage htmlcov {{ios_smoke}}
+    rm -rf ios/CameraGPSLink/build .pytest_cache .ruff_cache .coverage htmlcov {{ios_smoke}}
 
 # Build and publish the package to PyPI
 publish:

@@ -175,14 +175,14 @@ final class CoreLocationServiceAdapter: LocationServicing {
 }
 
 @MainActor
-final class SonyGeoTagAppModel: ObservableObject {
-    static func makeForCurrentProcess() -> SonyGeoTagAppModel {
+final class CameraGPSLinkAppModel: ObservableObject {
+    static func makeForCurrentProcess() -> CameraGPSLinkAppModel {
         #if DEBUG
         if let fixture = UITestAppModelFactory.makeFromEnvironment() {
             return fixture
         }
         #endif
-        return SonyGeoTagAppModel()
+        return CameraGPSLinkAppModel()
     }
 
     @Published private(set) var settings: LinkSettings

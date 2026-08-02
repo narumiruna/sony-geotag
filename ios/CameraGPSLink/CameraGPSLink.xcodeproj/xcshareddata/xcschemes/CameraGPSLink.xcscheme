@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A50000000000000000000001"
-               BuildableName = "SonyGeoTag.app"
-               BlueprintName = "SonyGeoTag"
-               ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+               BuildableName = "CameraGPSLink.app"
+               BlueprintName = "CameraGPSLink"
+               ReferencedContainer = "container:CameraGPSLink.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -34,9 +34,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5F8A57524C9E28CEC95092BA"
-               BuildableName = "SonyGeoTagUnitTests.xctest"
-               BlueprintName = "SonyGeoTagUnitTests"
-               ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+               BuildableName = "CameraGPSLinkUnitTests.xctest"
+               BlueprintName = "CameraGPSLinkUnitTests"
+               ReferencedContainer = "container:CameraGPSLink.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -44,9 +44,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AFDE03F1627E57726764BBF3"
-               BuildableName = "SonyGeoTagUITests.xctest"
-               BlueprintName = "SonyGeoTagUITests"
-               ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+               BuildableName = "CameraGPSLinkUITests.xctest"
+               BlueprintName = "CameraGPSLinkUITests"
+               ReferencedContainer = "container:CameraGPSLink.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -66,9 +66,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "SonyGeoTag.app"
-            BlueprintName = "SonyGeoTag"
-            ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+            BuildableName = "CameraGPSLink.app"
+            BlueprintName = "CameraGPSLink"
+            ReferencedContainer = "container:CameraGPSLink.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -83,9 +83,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "SonyGeoTag.app"
-            BlueprintName = "SonyGeoTag"
-            ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+            BuildableName = "CameraGPSLink.app"
+            BlueprintName = "CameraGPSLink"
+            ReferencedContainer = "container:CameraGPSLink.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -4,11 +4,11 @@ import UIKit
 #endif
 
 struct DiagnosticsView: View {
-    @ObservedObject private var appModel: SonyGeoTagAppModel
+    @ObservedObject private var appModel: CameraGPSLinkAppModel
     @ObservedObject private var logStore: DiagnosticsLogStore
     @State private var didCopy = false
 
-    init(appModel: SonyGeoTagAppModel) {
+    init(appModel: CameraGPSLinkAppModel) {
         _appModel = ObservedObject(wrappedValue: appModel)
         _logStore = ObservedObject(wrappedValue: appModel.diagnosticsStore)
     }

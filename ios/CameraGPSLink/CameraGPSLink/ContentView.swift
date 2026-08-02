@@ -4,7 +4,7 @@ import UIKit
 #endif
 
 struct ContentView: View {
-    @ObservedObject var appModel: SonyGeoTagAppModel
+    @ObservedObject var appModel: CameraGPSLinkAppModel
     @State private var showsSettings = false
 
     var body: some View {

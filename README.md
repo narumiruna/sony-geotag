@@ -7,7 +7,7 @@ Current verified target: Sony A7C II / `ILCE-7CM2`.
 ## What this repo contains
 
 - **Python CLI (`sonygeotag`)** for BLE discovery, GATT inspection, notification logging, and Sony `DD11` location-packet encoding/sending.
-- **Camera GPS Link iOS app (`ios/SonyGeoTag`)** built with SwiftUI, CoreBluetooth, and CoreLocation for foreground/background location linking.
+- **Camera GPS Link iOS app (`ios/CameraGPSLink`)** built with SwiftUI, CoreBluetooth, and CoreLocation for foreground/background location linking.
 - **Protocol notes** for the observed A7C II BLE services and location flow in `docs/a7c2-ble-map.md`.
 
 ## Safety first
@@ -142,13 +142,13 @@ Useful notes:
 The SwiftUI/CoreBluetooth/CoreLocation app lives in:
 
 ```bash
-ios/SonyGeoTag
+ios/CameraGPSLink
 ```
 
 Open with full Xcode:
 
 ```bash
-open ios/SonyGeoTag/SonyGeoTag.xcodeproj
+open ios/CameraGPSLink/CameraGPSLink.xcodeproj
 ```
 
 The iPhone interface is organized around the shooting workflow:
@@ -161,7 +161,7 @@ The iPhone interface is organized around the shooting workflow:
 - A separate Diagnostics screen preserving DD11/DD21, reconnect, remembered-device, location, and bounded debug-log details with a coordinate privacy warning.
 - CoreBluetooth restoration/pending reconnect and best-effort Background App Refresh, subject to iOS background limits.
 
-See `ios/SonyGeoTag/README.md` for the complete workflow, settings effects, permission states, diagnostics privacy, testing, and platform limitations.
+See `ios/CameraGPSLink/README.md` for the complete workflow, settings effects, permission states, diagnostics privacy, testing, and platform limitations.
 
 ## Development
 
@@ -193,7 +193,7 @@ just ios-build-device-nosign
 src/sonygeotag/          Python CLI and protocol helpers
 tests/                   Python tests
 docs/                    Protocol notes and implementation plans
-ios/SonyGeoTag/          SwiftUI iOS app and smoke test
+ios/CameraGPSLink/          SwiftUI iOS app and smoke test
 justfile                 Local command shortcuts
 ```
 

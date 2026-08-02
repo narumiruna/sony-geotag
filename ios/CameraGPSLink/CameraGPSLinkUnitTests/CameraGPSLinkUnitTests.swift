@@ -1,7 +1,7 @@
 import Combine
 import CoreLocation
 import XCTest
-@testable import SonyGeoTag
+@testable import CameraGPSLink
 
 final class ForegroundConnectionTimeoutPolicyTests: XCTestCase {
     func testForegroundStagesHaveFiniteTimeouts() {
@@ -96,7 +96,7 @@ final class LinkSettingsTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "SonyGeoTagUnitTests.\(UUID().uuidString)"
+        suiteName = "CameraGPSLinkUnitTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
     }
@@ -317,7 +317,7 @@ final class GeotaggingViewStateTests: XCTestCase {
 }
 
 @MainActor
-final class SonyGeoTagAppModelTests: XCTestCase {
+final class CameraGPSLinkAppModelTests: XCTestCase {
     func testStartWaitsForPermissionBeforeStartingBLE() {
         let camera = FakeCameraService()
         let location = FakeLocationService(permission: .notDetermined)
@@ -465,8 +465,8 @@ final class SonyGeoTagAppModelTests: XCTestCase {
         location: FakeLocationService,
         settings: LinkSettings = .default,
         settingsStore: FakeSettingsStore? = nil
-    ) -> SonyGeoTagAppModel {
-        SonyGeoTagAppModel(
+    ) -> CameraGPSLinkAppModel {
+        CameraGPSLinkAppModel(
             cameraService: camera,
             locationService: location,
             settingsStore: settingsStore ?? FakeSettingsStore(settings: settings),

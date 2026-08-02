@@ -4,7 +4,7 @@ import Foundation
 
 @MainActor
 enum UITestAppModelFactory {
-    static func makeFromEnvironment() -> SonyGeoTagAppModel? {
+    static func makeFromEnvironment() -> CameraGPSLinkAppModel? {
         guard let scenario = ProcessInfo.processInfo.environment["SONYGEOTAG_UI_SCENARIO"] else {
             return nil
         }
@@ -84,7 +84,7 @@ enum UITestAppModelFactory {
             )
         )
         let store = UITestSettingsStore(settings: settings, shouldFail: persistenceFails)
-        return SonyGeoTagAppModel(
+        return CameraGPSLinkAppModel(
             cameraService: cameraService,
             locationService: locationService,
             settingsStore: store,
