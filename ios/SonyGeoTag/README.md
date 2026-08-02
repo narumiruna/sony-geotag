@@ -1,104 +1,124 @@
-# SonyGeoTag iOS MVP
+# SonyGeoTag for iPhone
 
-Minimal SwiftUI iOS app for sending iPhone GPS updates to a Sony Alpha camera over BLE.
+SonyGeoTag sends the iPhone’s current location to a supported Sony Alpha camera over Bluetooth so newly captured photos can use the camera’s latest cached GPS fix.
 
-## Current scope
+Current verified camera: Sony A7C II / `ILCE-7CM2`.
 
-- Targets Sony A7C II / `ILCE-7CM2` first.
-- Scans BLE advertisements for Sony camera name/manufacturer data.
-- Connects with CoreBluetooth.
-- Performs the verified modern Sony location flow:
-  1. subscribe `DD01`
-  2. optional `EE01` vendor pairing init
-  3. write `DD30 = 01`
-  4. write `DD31 = 01`
-  5. read `DD32`, `DD33`, `DD21`
-  6. send `DD11` GPS packets periodically to keep the camera's cached GPS state fresh
-  7. cleanup with `DD31 = 00`, `DD30 = 00`
-- Uses CoreLocation for foreground/background GPS.
-- Offers a Background Link toggle and Low Power Mode.
-- Shows camera/GPS status and debug logs.
+## Geotagging workflow
 
-## Open in Xcode
+The home screen is organized around shooting readiness rather than BLE protocol details:
+
+1. Turn on the camera and make its Bluetooth location link available.
+2. Tap **Start Geotagging**.
+3. Grant location access when iOS asks. SonyGeoTag does not start the camera write flow before usable permission is available.
+4. Follow the visible stages: looking for the camera, connecting, preparing location, and sending the first location.
+5. Wait for **Ready to Geotag** before taking photos that need location data.
+
+**Ready to Geotag** appears only after the camera has successfully received at least one location packet in the current session. The Readiness group separately reports the camera, iPhone location, and last successful camera update.
+
+During a foreground connection attempt, **Cancel** remains available. Camera search, connection, and setup use bounded waits; a timeout preserves the remembered camera and offers **Retry** instead of leaving the interface indefinitely busy.
+
+While ready:
+
+- **Send Current Location** requests an immediate refresh.
+- **Stop Geotagging** safely closes the location link. It is reversible and does not delete settings or camera identity.
+
+## Link Settings
+
+Open **Link Settings** from the home screen. Changes are staged until **Apply**; **Cancel**, keyboard cancellation, or interactive sheet dismissal leaves persisted settings and running services unchanged.
+
+### Connection Availability
+
+- **While App Is Open** — runs only while SonyGeoTag is open.
+- **Continue in Background** — keeps location and remembered-camera reconnect behavior active when iOS permits it. This requires Always Location permission for reliable background updates.
+
+### Location Updates
+
+- **Battery Saver** — targets approximately 100 m location accuracy and sends about every 120 seconds.
+- **Best Accuracy** — uses the best available GPS accuracy and sends about every 30 seconds, using more battery.
+
+The Effect Preview describes the concrete permission, accuracy, frequency, and battery consequences before Apply. Both choices are applied together. If application fails, the previous valid settings remain active.
+
+Existing installs keep the same stored behavior: Background defaults off, Battery Saver defaults on, and the remembered CoreBluetooth peripheral remains unchanged.
+
+## Permission and partial states
+
+Location permission is requested after the user taps Start. If access is denied or restricted, SonyGeoTag remains disconnected and offers **Review Location Permission**.
+
+When Continue in Background is selected but only When-In-Use permission is available:
+
+- foreground geotagging continues to work;
+- the home screen shows **Background Permission Needed**;
+- **Allow Background Location** provides the recovery action;
+- the app does not claim that background setup is complete.
+
+Background reconnect is shown as **Waiting for Camera**, not as an endless foreground progress state. iOS can still throttle background scans, timers, location updates, and `BGAppRefreshTask` delivery. Force-quitting the app can prevent background relaunch.
+
+## Diagnostics and privacy
+
+**Diagnostics** is one level below the home screen and preserves the technical information needed for troubleshooting:
+
+- target and raw BLE state;
+- packets sent, DD11/DD21 configuration, update interval, and pending reconnect;
+- remembered peripheral and last-send time;
+- location permission, mode, coordinate, accuracy, and fix time;
+- a bounded 120-line debug log.
+
+Diagnostic logs can include recent coordinates. Review the warning and log contents before using **Copy Diagnostic Log** or sharing the result.
+
+## Sony protocol behavior
+
+The app retains the verified modern Sony location flow:
+
+1. subscribe to `DD01` when available;
+2. optionally send the `EE01` pairing initialization;
+3. write `DD30 = 01` and `DD31 = 01`;
+4. read `DD32`, `DD33`, and `DD21` when available;
+5. send periodic `DD11` location packets;
+6. clean up with `DD31 = 00` and `DD30 = 00`.
+
+`DD21` controls whether SonyGeoTag sends the 95-byte timezone-capable packet or the 91-byte packet. Protocol fields remain in Diagnostics rather than the primary shooting workflow.
+
+## Build and test
+
+Open the shared project:
 
 ```bash
-open ios/SonyGeoTag/SonyGeoTag.xcodeproj
+just ios-open
 ```
 
-Requirements:
-
-- Full Xcode installation, not only Command Line Tools.
-- Physical iPhone for real BLE + background-location testing.
-- Camera Bluetooth pairing mode for the first connection.
-
-CLI build verification commands:
+Run focused checks:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project ios/SonyGeoTag/SonyGeoTag.xcodeproj \
-  -target SonyGeoTag \
-  -sdk iphonesimulator \
-  -configuration Debug build
-
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project ios/SonyGeoTag/SonyGeoTag.xcodeproj \
-  -target SonyGeoTag \
-  -sdk iphoneos \
-  -configuration Debug \
-  CODE_SIGNING_ALLOWED=NO build
+just ios-smoke
+just ios-typecheck
+just ios-unit-test
+just ios-ui-test
+just ios-test
 ```
 
-Use Xcode GUI with a physical iPhone for signing, installation, and real BLE/background-location validation.
-
-## Background and low power behavior
-
-The camera does not ask the app for GPS right before shutter release. Instead, SonyGeoTag proactively writes `DD11` location packets so the camera can use the most recently cached GPS fix when a new photo is captured.
-
-- High accuracy / foreground shooting: best GPS accuracy and a 30-second DD11 interval.
-- Low Power Mode: lower CoreLocation accuracy, significant-location-change monitoring, and a 120-second DD11 interval.
-- Background Link: asks for Always Location permission, remembers the last camera peripheral, enables CoreBluetooth restoration, and arms a pending CoreBluetooth reconnect so iOS can wake the app when the remembered camera returns.
-- If Background Link only has When-In-Use permission, GPS stays foreground-only so iOS does not need to show the blue background-location indicator.
-- Background App Refresh: registers a `BGAppRefreshTask` as a best-effort maintenance wake-up to reschedule and attempt reconnect/location delivery.
-
-Limitations:
-
-- iOS may throttle background scans, timers, and `BGAppRefreshTask` delivery.
-- `BGAppRefreshTask` is opportunistic; it is not a continuous daemon and cannot guarantee GPS delivery before shutter release.
-- Force-quitting the app can prevent background relaunch.
-- Background behavior must be verified on a physical iPhone with the camera.
-
-Useful background reconnect log lines:
-
-```text
-Arming pending reconnect to remembered camera ...
-Pending reconnect already armed for remembered camera
-CoreBluetooth restored state
-Connected
-DD11 location OK
-```
-
-## Local protocol smoke test
+Run the complete iOS gate:
 
 ```bash
-swiftc \
-  ios/SonyGeoTag/SonyGeoTag/SonyProtocol.swift \
-  ios/SonyGeoTag/SonyGeoTagTests/main.swift \
-  -o /tmp/SonyProtocolSmoke
-/tmp/SonyProtocolSmoke
+just ios-check
 ```
 
-## iOS permissions
+The XCTest suite covers settings compatibility and rollback, permission sequencing, foreground timeout policy, readiness mapping, cancellation, retries, loading/partial/error states, settings preview/apply/cancel/dismissal, diagnostics, Dynamic Type, light/dark and increased-contrast appearances, reduced motion, accessibility audits, and portrait/landscape layouts. Debug-only launch fixtures make simulator UI tests deterministic and are unavailable in Release builds.
 
-`SonyGeoTag/Info.plist` includes:
+A physical iPhone is still required to validate real CoreBluetooth behavior, background restoration, and camera writes. Do not perform a real camera GPS write without explicit authorization.
 
-- Bluetooth usage descriptions
-- When-in-use and always location usage descriptions
-- `UIBackgroundModes`: `bluetooth-central`, `location`
+## Platform and accessibility
 
-## MVP limitations
+- Deployment target: iOS 17 or later.
+- Supported native device family: iPhone.
+- Supported orientations: portrait and landscape.
+- Layouts reflow for accessibility text sizes instead of truncating critical status or actions.
+- Status uses text and symbols rather than color alone.
+- Controls use accessible target sizes, semantic contrast, VoiceOver labels and restrained state announcements, keyboard default/cancel actions, and reduced-motion-safe feedback.
 
-- No App Store metadata or signing team configured yet.
-- No multi-camera UI.
-- No persistent paired-camera storage yet.
-- Background delivery still needs physical iPhone validation.
-- The app sends the latest GPS fix; it does not modify already-captured images.
+## Known limitations
+
+- A7C II / `ILCE-7CM2` is the only verified camera.
+- Background execution is opportunistic and cannot guarantee a fresh location immediately before every shutter release.
+- The app updates the camera’s cached location for new photos; it does not modify existing images.
+- Real BLE and background wake behavior cannot be fully simulated by XCUITest.

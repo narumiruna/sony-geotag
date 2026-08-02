@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B6CB9763455F1B66805D937 /* DiagnosticsLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91EEF86295BDE3EF8944F6F1 /* DiagnosticsLogStore.swift */; };
+		104595EFC68F4FC779E11225 /* SonyGeoTagAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1261685B92EB3D98C37A4C /* SonyGeoTagAppModel.swift */; };
+		2B479F39225870DEB9C4D7E7 /* LinkSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1665420B5C90F23BD5410EC6 /* LinkSettingsView.swift */; };
+		2FC9FB19FA2EEB1EEE05CB95 /* GeotaggingHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80F7E090D6DA23B15654EB6 /* GeotaggingHomeView.swift */; };
+		3CCED299EF103D830F15DE24 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB676953481397FF26F1462C /* DiagnosticsView.swift */; };
+		6708E57438C9C737FCEC62A0 /* SonyGeoTagUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC28FAA3D7B8CD04BA563E2A /* SonyGeoTagUITests.swift */; };
+		7AB1E6673410A1FD3297C681 /* CameraConnectionTimeout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09ACE91253FFD35895839B0 /* CameraConnectionTimeout.swift */; };
+		91EDFCE1ECB7F167A8629575 /* LinkSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04049E371AAA9A322C161EE /* LinkSettings.swift */; };
 		A10000000000000000000001 /* SonyGeoTagApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SonyGeoTagApp.swift */; };
 		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ContentView.swift */; };
 		A10000000000000000000003 /* LocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* LocationProvider.swift */; };
@@ -16,9 +24,36 @@
 		A10000000000000000000007 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* CoreBluetooth.framework */; };
 		A10000000000000000000008 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* CoreLocation.framework */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
+		A33D26C0EE99B9A5BF13F34E /* SonyGeoTagUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90A9F0D479AB410E42204A74 /* SonyGeoTagUnitTests.swift */; };
+		C06C7561A1EC8EC3183C676C /* UITestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 030683E6BCA300F0509C6F20 /* UITestFixtures.swift */; };
+		E961AC5AA684726D3BEF44C5 /* GeotaggingViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD3A99718D2D7D7396A01A8 /* GeotaggingViewState.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		41FDECE9DEF6606DEEEEC7BF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A60000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = SonyGeoTag;
+		};
+		A13718480EA5D8030AA9A4BB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A60000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = SonyGeoTag;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		030683E6BCA300F0509C6F20 /* UITestFixtures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestFixtures.swift; sourceTree = "<group>"; };
+		1665420B5C90F23BD5410EC6 /* LinkSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkSettingsView.swift; sourceTree = "<group>"; };
+		35390567B4C829222F5ACA85 /* SonyGeoTagUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonyGeoTagUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3F1261685B92EB3D98C37A4C /* SonyGeoTagAppModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SonyGeoTagAppModel.swift; sourceTree = "<group>"; };
+		778BC63EDEAE17135873C8EC /* SonyGeoTagUnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonyGeoTagUnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90A9F0D479AB410E42204A74 /* SonyGeoTagUnitTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SonyGeoTagUnitTests.swift; sourceTree = "<group>"; };
+		91EEF86295BDE3EF8944F6F1 /* DiagnosticsLogStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsLogStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000001 /* SonyGeoTagApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonyGeoTagApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* LocationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationProvider.swift; sourceTree = "<group>"; };
@@ -30,9 +65,22 @@
 		A20000000000000000000009 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		A2000000000000000000000A /* SonyGeoTag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SonyGeoTag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BC28FAA3D7B8CD04BA563E2A /* SonyGeoTagUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SonyGeoTagUITests.swift; sourceTree = "<group>"; };
+		C04049E371AAA9A322C161EE /* LinkSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkSettings.swift; sourceTree = "<group>"; };
+		C09ACE91253FFD35895839B0 /* CameraConnectionTimeout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraConnectionTimeout.swift; sourceTree = "<group>"; };
+		DFD3A99718D2D7D7396A01A8 /* GeotaggingViewState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeotaggingViewState.swift; sourceTree = "<group>"; };
+		E80F7E090D6DA23B15654EB6 /* GeotaggingHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeotaggingHomeView.swift; sourceTree = "<group>"; };
+		FB676953481397FF26F1462C /* DiagnosticsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		8CE5E7E8F3BBCA271C0980C1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A30000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -42,15 +90,42 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E3A7F2F5F6ACE6C5B0055A88 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		319ADE2E7B05C87EB3DD3886 /* SonyGeoTagUITests */ = {
+			isa = PBXGroup;
+			children = (
+				BC28FAA3D7B8CD04BA563E2A /* SonyGeoTagUITests.swift */,
+			);
+			name = SonyGeoTagUITests;
+			path = SonyGeoTagUITests;
+			sourceTree = "<group>";
+		};
+		99172B76B7680458012E4E6C /* SonyGeoTagUnitTests */ = {
+			isa = PBXGroup;
+			children = (
+				90A9F0D479AB410E42204A74 /* SonyGeoTagUnitTests.swift */,
+			);
+			name = SonyGeoTagUnitTests;
+			path = SonyGeoTagUnitTests;
+			sourceTree = "<group>";
+		};
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000002 /* SonyGeoTag */,
 				A40000000000000000000003 /* Frameworks */,
 				A40000000000000000000004 /* Products */,
+				99172B76B7680458012E4E6C /* SonyGeoTagUnitTests */,
+				319ADE2E7B05C87EB3DD3886 /* SonyGeoTagUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -65,6 +140,15 @@
 				A20000000000000000000006 /* SonyProtocol.swift */,
 				A2000000000000000000000B /* Assets.xcassets */,
 				A20000000000000000000007 /* Info.plist */,
+				C04049E371AAA9A322C161EE /* LinkSettings.swift */,
+				DFD3A99718D2D7D7396A01A8 /* GeotaggingViewState.swift */,
+				3F1261685B92EB3D98C37A4C /* SonyGeoTagAppModel.swift */,
+				91EEF86295BDE3EF8944F6F1 /* DiagnosticsLogStore.swift */,
+				E80F7E090D6DA23B15654EB6 /* GeotaggingHomeView.swift */,
+				1665420B5C90F23BD5410EC6 /* LinkSettingsView.swift */,
+				FB676953481397FF26F1462C /* DiagnosticsView.swift */,
+				030683E6BCA300F0509C6F20 /* UITestFixtures.swift */,
+				C09ACE91253FFD35895839B0 /* CameraConnectionTimeout.swift */,
 			);
 			path = SonyGeoTag;
 			sourceTree = "<group>";
@@ -82,6 +166,8 @@
 			isa = PBXGroup;
 			children = (
 				A2000000000000000000000A /* SonyGeoTag.app */,
+				778BC63EDEAE17135873C8EC /* SonyGeoTagUnitTests.xctest */,
+				35390567B4C829222F5ACA85 /* SonyGeoTagUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +175,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5F8A57524C9E28CEC95092BA /* SonyGeoTagUnitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CDB1FDD3041F9E6260268D35 /* Build configuration list for PBXNativeTarget "SonyGeoTagUnitTests" */;
+			buildPhases = (
+				4FA919F3F05EDAFCECA326C9 /* Sources */,
+				E3A7F2F5F6ACE6C5B0055A88 /* Frameworks */,
+				3BF14E611CBE27EAF9555476 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DD0EB5DD33DE67E0A5C8B4EE /* PBXTargetDependency */,
+			);
+			name = SonyGeoTagUnitTests;
+			productName = SonyGeoTagUnitTests;
+			productReference = 778BC63EDEAE17135873C8EC /* SonyGeoTagUnitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		A50000000000000000000001 /* SonyGeoTag */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A70000000000000000000002 /* Build configuration list for PBXNativeTarget "SonyGeoTag" */;
@@ -105,6 +209,24 @@
 			productName = SonyGeoTag;
 			productReference = A2000000000000000000000A /* SonyGeoTag.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AFDE03F1627E57726764BBF3 /* SonyGeoTagUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 66CC6776EE9AF730DB53FD10 /* Build configuration list for PBXNativeTarget "SonyGeoTagUITests" */;
+			buildPhases = (
+				8C005A3D2CF9E6FC543A6097 /* Sources */,
+				8CE5E7E8F3BBCA271C0980C1 /* Frameworks */,
+				051B54EE9BD0027CF89CF76A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				60ACEDD0A7A80D67831C37A4 /* PBXTargetDependency */,
+			);
+			name = SonyGeoTagUITests;
+			productName = SonyGeoTagUITests;
+			productReference = 35390567B4C829222F5ACA85 /* SonyGeoTagUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -135,11 +257,27 @@
 			projectRoot = "";
 			targets = (
 				A50000000000000000000001 /* SonyGeoTag */,
+				5F8A57524C9E28CEC95092BA /* SonyGeoTagUnitTests */,
+				AFDE03F1627E57726764BBF3 /* SonyGeoTagUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		051B54EE9BD0027CF89CF76A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3BF14E611CBE27EAF9555476 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A30000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -151,6 +289,22 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		4FA919F3F05EDAFCECA326C9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A33D26C0EE99B9A5BF13F34E /* SonyGeoTagUnitTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8C005A3D2CF9E6FC543A6097 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6708E57438C9C737FCEC62A0 /* SonyGeoTagUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A30000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -161,12 +315,87 @@
 				A10000000000000000000004 /* CameraBLEManager.swift in Sources */,
 				A10000000000000000000005 /* CameraConnectionState.swift in Sources */,
 				A10000000000000000000006 /* SonyProtocol.swift in Sources */,
+				91EDFCE1ECB7F167A8629575 /* LinkSettings.swift in Sources */,
+				E961AC5AA684726D3BEF44C5 /* GeotaggingViewState.swift in Sources */,
+				104595EFC68F4FC779E11225 /* SonyGeoTagAppModel.swift in Sources */,
+				0B6CB9763455F1B66805D937 /* DiagnosticsLogStore.swift in Sources */,
+				2FC9FB19FA2EEB1EEE05CB95 /* GeotaggingHomeView.swift in Sources */,
+				2B479F39225870DEB9C4D7E7 /* LinkSettingsView.swift in Sources */,
+				3CCED299EF103D830F15DE24 /* DiagnosticsView.swift in Sources */,
+				C06C7561A1EC8EC3183C676C /* UITestFixtures.swift in Sources */,
+				7AB1E6673410A1FD3297C681 /* CameraConnectionTimeout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		60ACEDD0A7A80D67831C37A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SonyGeoTag;
+			target = A50000000000000000000001 /* SonyGeoTag */;
+			targetProxy = A13718480EA5D8030AA9A4BB /* PBXContainerItemProxy */;
+		};
+		DD0EB5DD33DE67E0A5C8B4EE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SonyGeoTag;
+			target = A50000000000000000000001 /* SonyGeoTag */;
+			targetProxy = 41FDECE9DEF6606DEEEEC7BF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		2C2EDC4C5D5C82E28119448E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.narumi.SonyGeoTagUnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SonyGeoTag.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SonyGeoTag";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		54843C3AA5100E4E69824884 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.narumi.SonyGeoTagUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SonyGeoTag;
+			};
+			name = Debug;
+		};
+		A6426728BB136953D04B8E26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.narumi.SonyGeoTagUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = SonyGeoTag;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		A80000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -327,9 +556,35 @@
 			};
 			name = Release;
 		};
+		F86510394D3D7A07895CF3BB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.narumi.SonyGeoTagUnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SonyGeoTag.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SonyGeoTag";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		66CC6776EE9AF730DB53FD10 /* Build configuration list for PBXNativeTarget "SonyGeoTagUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6426728BB136953D04B8E26 /* Release */,
+				54843C3AA5100E4E69824884 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A70000000000000000000001 /* Build configuration list for PBXProject "SonyGeoTag" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -344,6 +599,15 @@
 			buildConfigurations = (
 				A80000000000000000000003 /* Debug */,
 				A80000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CDB1FDD3041F9E6260268D35 /* Build configuration list for PBXNativeTarget "SonyGeoTagUnitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2C2EDC4C5D5C82E28119448E /* Release */,
+				F86510394D3D7A07895CF3BB /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

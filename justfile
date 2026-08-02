@@ -5,6 +5,8 @@ ios_project := "ios/SonyGeoTag/SonyGeoTag.xcodeproj"
 ios_target := "SonyGeoTag"
 ios_scheme := "SonyGeoTag"
 ios_smoke := "/tmp/SonyGeoTagSmoke"
+ios_test_device_name := "SonyGeoTag Tests"
+ios_test_destination := "platform=iOS Simulator,name=" + ios_test_device_name + ",OS=latest"
 
 [default]
 all: check
@@ -69,8 +71,32 @@ ios-build-sim:
 ios-build-device-nosign:
     DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild -project {{ios_project}} -target {{ios_target}} -sdk iphoneos -configuration Debug CODE_SIGNING_ALLOWED=NO build
 
-# Run all iOS compile/smoke checks
-ios-check: ios-smoke ios-typecheck ios-lint-project ios-build-sim ios-build-device-nosign
+# Create a project-dedicated simulator so concurrent XCUITest suites cannot steal focus
+ios-test-prepare:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! DEVELOPER_DIR={{xcode_dev_dir}} xcrun simctl list devices available | grep -Fq '{{ios_test_device_name}} ('; then
+        runtime=$(DEVELOPER_DIR={{xcode_dev_dir}} xcrun simctl list runtimes available -j | python3 -c 'import json,sys; runtimes=[r for r in json.load(sys.stdin)["runtimes"] if r["platform"] == "iOS" and r.get("isAvailable", True)]; print(runtimes[-1]["identifier"])')
+        DEVELOPER_DIR={{xcode_dev_dir}} xcrun simctl create '{{ios_test_device_name}}' com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$runtime" >/dev/null
+    fi
+
+# Run the iOS XCTest unit suite
+[no-exit-message]
+ios-unit-test: ios-test-prepare
+    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:SonyGeoTagUnitTests
+
+# Run the iOS XCUITest suite
+[no-exit-message]
+ios-ui-test: ios-test-prepare
+    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}' -only-testing:SonyGeoTagUITests
+
+# Run all iOS XCTest suites
+[no-exit-message]
+ios-test: ios-test-prepare
+    DEVELOPER_DIR={{xcode_dev_dir}} xcodebuild test -project {{ios_project}} -scheme {{ios_scheme}} -destination '{{ios_test_destination}}'
+
+# Run all iOS compile/smoke/test checks
+ios-check: ios-smoke ios-typecheck ios-lint-project ios-build-sim ios-build-device-nosign ios-test
 
 # Show Xcode destinations for the app scheme
 ios-destinations:

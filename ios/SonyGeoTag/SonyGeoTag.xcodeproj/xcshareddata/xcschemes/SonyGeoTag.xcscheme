@@ -29,6 +29,26 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5F8A57524C9E28CEC95092BA"
+               BuildableName = "SonyGeoTagUnitTests.xctest"
+               BlueprintName = "SonyGeoTagUnitTests"
+               ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AFDE03F1627E57726764BBF3"
+               BuildableName = "SonyGeoTagUITests.xctest"
+               BlueprintName = "SonyGeoTagUITests"
+               ReferencedContainer = "container:SonyGeoTag.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

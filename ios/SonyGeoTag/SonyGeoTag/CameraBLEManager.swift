@@ -12,7 +12,6 @@ final class CameraBLEManager: NSObject, ObservableObject {
     @Published private(set) var includeTimezone = true
     @Published private(set) var dd21ConfigHex: String?
     @Published private(set) var lastError: String?
-    @Published private(set) var logLines: [String] = []
     @Published private(set) var backgroundLinkEnabled = UserDefaults.standard.bool(
         forKey: CameraBLEDefaults.backgroundLinkEnabled
     )
@@ -40,7 +39,9 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private var resumeWhenBluetoothPowersOn = false
     private var manualStopRequested = false
     private var reconnectRetryTimer: Timer?
+    private var foregroundTimeoutSession: ForegroundConnectionTimeoutSession!
     private let operationTimeout: TimeInterval = 12
+    private let diagnosticsStore: DiagnosticsLogStore
     private let logger = Logger(subsystem: "com.narumi.SonyGeoTag", category: "BLE")
     private let connectOptions: [String: Any] = [
         CBConnectPeripheralOptionNotifyOnConnectionKey: true,
@@ -48,8 +49,31 @@ final class CameraBLEManager: NSObject, ObservableObject {
         CBConnectPeripheralOptionNotifyOnNotificationKey: true,
     ]
 
-    override init() {
+    override convenience init() {
+        self.init(diagnosticsStore: DiagnosticsLogStore())
+    }
+
+    convenience init(diagnosticsStore: DiagnosticsLogStore) {
+        self.init(
+            diagnosticsStore: diagnosticsStore,
+            timeoutPolicy: ForegroundConnectionTimeoutPolicy(),
+            timeoutScheduler: .live
+        )
+    }
+
+    init(
+        diagnosticsStore: DiagnosticsLogStore,
+        timeoutPolicy: ForegroundConnectionTimeoutPolicy,
+        timeoutScheduler: ConnectionTimeoutScheduler
+    ) {
+        self.diagnosticsStore = diagnosticsStore
         super.init()
+        foregroundTimeoutSession = ForegroundConnectionTimeoutSession(
+            policy: timeoutPolicy,
+            scheduler: timeoutScheduler
+        ) { [weak self] stage in
+            self?.handleConnectionStageTimeout(stage: stage)
+        }
         updateInterval = lowPowerModeEnabled
             ? CameraBLEDefaults.lowPowerUpdateInterval
             : CameraBLEDefaults.foregroundUpdateInterval
@@ -62,6 +86,10 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
     var canStart: Bool {
         state != .scanning && state != .connecting && state != .discovering && state != .enablingLocation && state != .linked
+    }
+
+    var logLines: [String] {
+        diagnosticsStore.lines
     }
 
     func configure(backgroundLinkEnabled: Bool, lowPowerModeEnabled: Bool) {
@@ -83,9 +111,6 @@ final class CameraBLEManager: NSObject, ObservableObject {
         if state == .linked {
             restartSendTimer()
         }
-        if backgroundLinkEnabled, canStart, locationProvider != nil {
-            armBackgroundReconnect(reason: "Background Link setting enabled")
-        }
         if !backgroundLinkEnabled {
             disarmPendingReconnect()
         }
@@ -93,19 +118,18 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
     func setLocationProvider(_ locationProvider: @escaping () -> CLLocation?) {
         self.locationProvider = locationProvider
-        if backgroundLinkEnabled, canStart {
-            armBackgroundReconnect(reason: "Location provider became available")
-        }
     }
 
     func startLink(locationProvider: @escaping () -> CLLocation?) {
         setLocationProvider(locationProvider)
         manualStopRequested = false
         prepareForNewSession(resetCounters: true)
+        foregroundTimeoutSession.begin()
         appendLog("Starting Sony location link")
 
         guard centralManager.state == .poweredOn else {
-            resumeWhenBluetoothPowersOn = backgroundLinkEnabled
+            foregroundTimeoutSession.end()
+            resumeWhenBluetoothPowersOn = false
             state = .bluetoothUnavailable
             appendLog("Bluetooth is not powered on: \(centralManager.state.rawValue)")
             return
@@ -118,14 +142,37 @@ final class CameraBLEManager: NSObject, ObservableObject {
         guard backgroundLinkEnabled else { return }
         guard canStart else { return }
         manualStopRequested = false
+        foregroundTimeoutSession.end()
         prepareForNewSession(resetCounters: false)
         appendLog("Background link enabled; attempting camera reconnect")
         armBackgroundReconnect(reason: "Background Link resume")
     }
 
+    func cancelCurrentAttempt() {
+        appendLog("Cancelling current connection attempt")
+        manualStopRequested = true
+        cancelConnectionStageTimeout()
+        resumeWhenBluetoothPowersOn = false
+        centralManager.stopScan()
+        disarmPendingReconnect()
+        stopTimer()
+        stopOperationTimeout()
+        operationQueue.removeAll()
+        pendingOperation = nil
+        onQueueEmpty = nil
+        if let peripheral, peripheral.state != .disconnected {
+            centralManager.cancelPeripheralConnection(peripheral)
+        }
+        self.peripheral = nil
+        characteristics.removeAll()
+        didStartLocationSetup = false
+        state = .stopped
+    }
+
     func stopLink() {
         appendLog("Stopping Sony location link")
         manualStopRequested = true
+        cancelConnectionStageTimeout()
         resumeWhenBluetoothPowersOn = false
         centralManager.stopScan()
         disarmPendingReconnect()
@@ -153,6 +200,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     }
 
     private func prepareForNewSession(resetCounters: Bool) {
+        cancelConnectionStageTimeout()
         if resetCounters {
             packetsSent = 0
             lastSentAt = nil
@@ -206,6 +254,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
             return false
         }
 
+        startConnectionStageTimeout(.connecting)
         switch rememberedPeripheral.state {
         case .connected:
             appendLog("Remembered camera already connected; discovering services")
@@ -255,6 +304,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
     private func scanForCamera() {
         state = .scanning
+        startConnectionStageTimeout(.scanning)
         let mode = backgroundLinkEnabled ? "background-capable" : "foreground"
         appendLog("Scanning for \(targetName) (\(mode); iOS may throttle background scans)")
         centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
@@ -262,6 +312,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
     private func beginServiceDiscovery(for peripheral: CBPeripheral) {
         state = .discovering
+        startConnectionStageTimeout(.discovering)
         peripheral.delegate = self
         let serviceUUIDs = [
             CBUUID(string: SonyProtocol.locationServiceUUID),
@@ -281,6 +332,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
 
         didStartLocationSetup = true
         state = .enablingLocation
+        startConnectionStageTimeout(.preparing)
         appendLog("Required Sony location characteristics found")
 
         if characteristic(SonyProtocol.locationStatusNotifyUUID) != nil {
@@ -325,6 +377,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     }
 
     private func startSendingLocations() {
+        cancelConnectionStageTimeout()
         state = .linked
         appendLog(
             "Location link active; interval=\(Int(updateInterval))s; send photos only after DD11 location OK / Packets sent > 0"
@@ -482,6 +535,8 @@ final class CameraBLEManager: NSObject, ObservableObject {
     }
 
     private func fail(_ message: String) {
+        cancelConnectionStageTimeout()
+        manualStopRequested = true
         lastError = message
         state = .failed
         stopTimer()
@@ -508,6 +563,36 @@ final class CameraBLEManager: NSObject, ObservableObject {
         operationTimeoutTimer = nil
     }
 
+    private func startConnectionStageTimeout(_ stage: ForegroundConnectionStage) {
+        foregroundTimeoutSession.transition(to: stage)
+    }
+
+    private func cancelConnectionStageTimeout() {
+        foregroundTimeoutSession.end()
+    }
+
+    private func handleConnectionStageTimeout(stage: ForegroundConnectionStage) {
+        manualStopRequested = true
+        resumeWhenBluetoothPowersOn = false
+        centralManager.stopScan()
+        if let peripheral, peripheral.state != .disconnected {
+            centralManager.cancelPeripheralConnection(peripheral)
+        }
+        self.peripheral = nil
+        stopTimer()
+        stopOperationTimeout()
+        operationQueue.removeAll()
+        pendingOperation = nil
+        onQueueEmpty = nil
+        characteristics.removeAll()
+        didStartLocationSetup = false
+        pendingReconnectArmed = false
+        let message = "\(stage.userFacingName) timed out. Make sure the camera is nearby and ready for its Bluetooth location link."
+        lastError = message
+        state = .failed
+        appendLog("Failed: \(message)")
+    }
+
     private func handleOperationTimeout() {
         guard let pendingOperation else { return }
         self.pendingOperation = nil
@@ -522,12 +607,9 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private func appendLog(_ message: String) {
         let timestamp = Date().formatted(date: .omitted, time: .standard)
         let line = "\(timestamp)  \(message)"
-        logLines.append(line)
+        diagnosticsStore.append(line)
         print(line)
         logger.info("\(line, privacy: .public)")
-        if logLines.count > 120 {
-            logLines.removeFirst(logLines.count - 120)
-        }
     }
 
     private func remember(peripheral: CBPeripheral) {
@@ -564,7 +646,7 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             if state == .bluetoothUnavailable {
                 state = .idle
             }
-            if resumeWhenBluetoothPowersOn || (backgroundLinkEnabled && canStart) {
+            if resumeWhenBluetoothPowersOn {
                 resumeWhenBluetoothPowersOn = false
                 guard locationProvider != nil else {
                     appendLog("Background link waiting for location provider")
@@ -573,6 +655,7 @@ extension CameraBLEManager: CBCentralManagerDelegate {
                 armBackgroundReconnect(reason: "Bluetooth powered on")
             }
         case .poweredOff, .unauthorized, .unsupported, .resetting, .unknown:
+            cancelConnectionStageTimeout()
             state = .bluetoothUnavailable
             appendLog("Bluetooth state changed: \(central.state.rawValue)")
         @unknown default:
@@ -586,6 +669,7 @@ extension CameraBLEManager: CBCentralManagerDelegate {
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
+        guard !manualStopRequested else { return }
         let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let name = peripheral.name ?? localName ?? ""
         let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
@@ -601,6 +685,7 @@ extension CameraBLEManager: CBCentralManagerDelegate {
             appendLog("Sony protocolVersion=\(info.protocolVersion.map(String.init) ?? "unknown")")
         }
         state = .connecting
+        startConnectionStageTimeout(.connecting)
         pendingReconnectArmed = false
         central.stopScan()
         self.peripheral = peripheral
@@ -609,6 +694,10 @@ extension CameraBLEManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        guard !manualStopRequested else {
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         appendLog("Connected")
         pendingReconnectArmed = false
         reconnectRetryTimer?.invalidate()
@@ -618,9 +707,15 @@ extension CameraBLEManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        let wasForegroundAttempt = foregroundTimeoutSession.isActive
+        cancelConnectionStageTimeout()
         appendLog(error?.localizedDescription ?? "Failed to connect")
         pendingReconnectArmed = false
         self.peripheral = nil
+        if wasForegroundAttempt {
+            fail(error?.localizedDescription ?? "Failed to connect")
+            return
+        }
         guard backgroundLinkEnabled, !manualStopRequested else {
             fail(error?.localizedDescription ?? "Failed to connect")
             return
@@ -630,6 +725,8 @@ extension CameraBLEManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        let wasForegroundAttempt = foregroundTimeoutSession.isActive
+        cancelConnectionStageTimeout()
         appendLog("Disconnected")
         self.peripheral = nil
         stopTimer()
@@ -639,7 +736,11 @@ extension CameraBLEManager: CBCentralManagerDelegate {
         characteristics.removeAll()
         didStartLocationSetup = false
 
-        guard state != .stopped, state != .stopping else { return }
+        guard state != .stopped, state != .stopping, state != .failed else { return }
+        if wasForegroundAttempt {
+            fail(error?.localizedDescription ?? "Camera disconnected while connecting.")
+            return
+        }
         guard backgroundLinkEnabled, !manualStopRequested else {
             if let error {
                 fail(error.localizedDescription)
@@ -675,6 +776,7 @@ extension CameraBLEManager: CBCentralManagerDelegate {
 
 extension CameraBLEManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard !manualStopRequested else { return }
         if let error {
             fail(error.localizedDescription)
             return
@@ -695,6 +797,7 @@ extension CameraBLEManager: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard !manualStopRequested else { return }
         if let error {
             fail(error.localizedDescription)
             return

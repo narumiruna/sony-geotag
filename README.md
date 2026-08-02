@@ -151,15 +151,17 @@ Open with full Xcode:
 open ios/SonyGeoTag/SonyGeoTag.xcodeproj
 ```
 
-Current app capabilities:
+The iPhone interface is organized around the shooting workflow:
 
-- Camera scan/connect and Sony location-link setup.
-- Foreground high-accuracy mode.
-- Low Power Mode using lower CoreLocation accuracy and less frequent `DD11` writes.
-- Background Link with Always Location permission, CoreBluetooth restoration/pending reconnect, and best-effort Background App Refresh.
-- Hidden iOS background-location blue indicator where the OS permits it; When-In-Use permission stays foreground-only.
+- **Start Geotagging**, visible connection stages, foreground cancellation, bounded waits, and actionable Retry.
+- **Ready to Geotag** only after the camera receives the first successful location update in the current session.
+- A compact Readiness summary for camera, iPhone location, and the last camera update.
+- Applied Link Settings for While Open/Background availability and Battery Saver/Best Accuracy updates, with a concrete preview and side-effect-free cancellation.
+- Explicit partial-state recovery when Background is selected without Always Location permission.
+- A separate Diagnostics screen preserving DD11/DD21, reconnect, remembered-device, location, and bounded debug-log details with a coordinate privacy warning.
+- CoreBluetooth restoration/pending reconnect and best-effort Background App Refresh, subject to iOS background limits.
 
-See `ios/SonyGeoTag/README.md` for iOS-specific build, behavior, and limitation notes.
+See `ios/SonyGeoTag/README.md` for the complete workflow, settings effects, permission states, diagnostics privacy, testing, and platform limitations.
 
 ## Development
 
@@ -178,6 +180,9 @@ Useful iOS commands:
 just ios-open
 just ios-smoke
 just ios-typecheck
+just ios-unit-test
+just ios-ui-test
+just ios-test
 just ios-build-sim
 just ios-build-device-nosign
 ```
@@ -197,4 +202,5 @@ justfile                 Local command shortcuts
 - A7C II / `ILCE-7CM2` is the only verified target so far.
 - BLE behavior may differ across Sony models and firmware versions.
 - iOS background delivery is opportunistic; force-quitting the app can prevent background relaunch.
-- Physical-device testing is required for real BLE, camera writes, and background-location behavior.
+- The native iOS target currently supports iPhone on iOS 17 or later in portrait and landscape.
+- Physical-device testing is required for real BLE, camera writes, and background-location behavior; real camera GPS writes require explicit authorization.

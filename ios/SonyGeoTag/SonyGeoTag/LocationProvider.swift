@@ -264,13 +264,12 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
-        #if os(iOS)
-        if backgroundLinkEnabled, authorizationStatus == .authorizedWhenInUse {
-            manager.requestAlwaysAuthorization()
-        }
-        #endif
         if isLocationAuthorized {
-            startUpdating()
+            applyLocationSettings()
+            refreshBackgroundPermissionWarning(clearResolvedErrors: true)
+            if isUpdating {
+                startLocationServices()
+            }
         } else if authorizationStatus == .denied || authorizationStatus == .restricted {
             stopUpdating()
             lastError = "Location permission is not available."
