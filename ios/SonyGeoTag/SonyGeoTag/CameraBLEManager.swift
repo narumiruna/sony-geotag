@@ -42,7 +42,7 @@ final class CameraBLEManager: NSObject, ObservableObject {
     private var foregroundTimeoutSession: ForegroundConnectionTimeoutSession!
     private let operationTimeout: TimeInterval = 12
     private let diagnosticsStore: DiagnosticsLogStore
-    private let logger = Logger(subsystem: "com.narumi.SonyGeoTag", category: "BLE")
+    private let logger = Logger(subsystem: "dev.narumi.cameragpslink", category: "BLE")
     private let connectOptions: [String: Any] = [
         CBConnectPeripheralOptionNotifyOnConnectionKey: true,
         CBConnectPeripheralOptionNotifyOnDisconnectionKey: true,
@@ -887,7 +887,7 @@ private enum PendingBLEOperation {
 }
 
 private enum CameraBLEDefaults {
-    static let restorationIdentifier = "com.narumi.SonyGeoTag.central"
+    static let restorationIdentifier = "dev.narumi.cameragpslink.central"
     static let backgroundLinkEnabled = "backgroundLinkEnabled"
     static let lowPowerModeEnabled = "lowPowerModeEnabled"
     static let rememberedPeripheralID = "rememberedPeripheralID"

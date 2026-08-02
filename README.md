@@ -7,7 +7,7 @@ Current verified target: Sony A7C II / `ILCE-7CM2`.
 ## What this repo contains
 
 - **Python CLI (`sonygeotag`)** for BLE discovery, GATT inspection, notification logging, and Sony `DD11` location-packet encoding/sending.
-- **iOS app (`ios/SonyGeoTag`)** built with SwiftUI, CoreBluetooth, and CoreLocation for foreground/background location link testing.
+- **Camera GPS Link iOS app (`ios/SonyGeoTag`)** built with SwiftUI, CoreBluetooth, and CoreLocation for foreground/background location linking.
 - **Protocol notes** for the observed A7C II BLE services and location flow in `docs/a7c2-ble-map.md`.
 
 ## Safety first

@@ -13,7 +13,8 @@ final class SonyGeoTagUITests: XCTestCase {
     func testNotConnectedPrioritizesStartAndHidesProtocolDetails() {
         launch("not-connected")
 
-        XCTAssertTrue(app.staticTexts["Not Connected"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Camera GPS Link"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Not Connected"].exists)
         XCTAssertTrue(app.buttons["Start Geotagging"].exists)
         XCTAssertTrue(app.staticTexts["Camera"].exists)
         XCTAssertTrue(app.staticTexts["iPhone Location"].exists)

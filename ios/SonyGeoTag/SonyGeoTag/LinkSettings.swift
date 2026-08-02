@@ -57,7 +57,7 @@ struct LinkSettings: Equatable {
     var effectPreview: String {
         let delivery = switch connectionAvailability {
         case .whileAppIsOpen:
-            "Runs only while Sony GeoTag is open."
+            "Runs only while Camera GPS Link is open."
         case .continueInBackground:
             "Keeps reconnecting when possible and requires Always Location permission. iOS may pause it after force-quit."
         }

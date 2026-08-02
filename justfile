@@ -104,7 +104,7 @@ ios-destinations:
 
 # Launch the installed iOS app on a USB-connected device and attach console output
 ios-console device="00008140-0001588C017B001C":
-    DEVELOPER_DIR={{xcode_dev_dir}} xcrun devicectl device process launch --device {{device}} --console com.narumi.SonyGeoTag
+    DEVELOPER_DIR={{xcode_dev_dir}} xcrun devicectl device process launch --device {{device}} --console dev.narumi.cameragpslink
 
 # Scan for the camera over BLE
 ble-scan target="ILCE-7CM2":

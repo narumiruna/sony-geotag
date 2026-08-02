@@ -199,7 +199,7 @@ struct GeotaggingViewState: Equatable {
         case .ready:
             return ("Ready to Geotag", "New photos can use the latest location sent from this iPhone.")
         case .waitingInBackground:
-            return ("Waiting for Camera", "Sony GeoTag will reconnect when the remembered camera becomes available.")
+            return ("Waiting for Camera", "Camera GPS Link will reconnect when the remembered camera becomes available.")
         case .stopping:
             return ("Stopping…", "Closing the camera location link safely.")
         case .stopped:
@@ -209,7 +209,7 @@ struct GeotaggingViewState: Equatable {
                 return ("Location Access Needed", "Location access is off. Review permission in iOS Settings, then retry.")
             }
             if snapshot.cameraState == .bluetoothUnavailable {
-                return ("Bluetooth Unavailable", "Turn on Bluetooth and keep Sony GeoTag open, then retry.")
+                return ("Bluetooth Unavailable", "Turn on Bluetooth and keep Camera GPS Link open, then retry.")
             }
             if snapshot.cameraState == .linked, let lastSentAt = snapshot.lastSentAt,
                now.timeIntervalSince(lastSentAt) > 5 * 60 {

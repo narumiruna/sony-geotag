@@ -1,6 +1,6 @@
-# SonyGeoTag for iPhone
+# Camera GPS Link for iPhone
 
-SonyGeoTag sends the iPhone’s current location to a supported Sony Alpha camera over Bluetooth so newly captured photos can use the camera’s latest cached GPS fix.
+Camera GPS Link sends the iPhone’s current location to a supported camera over Bluetooth so newly captured photos can use the camera’s latest cached GPS fix.
 
 Current verified camera: Sony A7C II / `ILCE-7CM2`.
 
@@ -10,7 +10,7 @@ The home screen is organized around shooting readiness rather than BLE protocol 
 
 1. Turn on the camera and make its Bluetooth location link available.
 2. Tap **Start Geotagging**.
-3. Grant location access when iOS asks. SonyGeoTag does not start the camera write flow before usable permission is available.
+3. Grant location access when iOS asks. Camera GPS Link does not start the camera write flow before usable permission is available.
 4. Follow the visible stages: looking for the camera, connecting, preparing location, and sending the first location.
 5. Wait for **Ready to Geotag** before taking photos that need location data.
 
@@ -29,7 +29,7 @@ Open **Link Settings** from the home screen. Changes are staged until **Apply**;
 
 ### Connection Availability
 
-- **While App Is Open** — runs only while SonyGeoTag is open.
+- **While App Is Open** — runs only while Camera GPS Link is open.
 - **Continue in Background** — keeps location and remembered-camera reconnect behavior active when iOS permits it. This requires Always Location permission for reliable background updates.
 
 ### Location Updates
@@ -39,11 +39,11 @@ Open **Link Settings** from the home screen. Changes are staged until **Apply**;
 
 The Effect Preview describes the concrete permission, accuracy, frequency, and battery consequences before Apply. Both choices are applied together. If application fails, the previous valid settings remain active.
 
-Existing installs keep the same stored behavior: Background defaults off, Battery Saver defaults on, and the remembered CoreBluetooth peripheral remains unchanged.
+Within the current app identity, updates keep the same stored behavior: Background defaults off, Battery Saver defaults on, and the remembered CoreBluetooth peripheral remains unchanged. The bundle identifier changed from the earlier development identifier `com.narumi.SonyGeoTag` to `dev.narumi.cameragpslink`; iOS treats those as separate apps, so sandboxed settings from an older development install do not migrate automatically.
 
 ## Permission and partial states
 
-Location permission is requested after the user taps Start. If access is denied or restricted, SonyGeoTag remains disconnected and offers **Review Location Permission**.
+Location permission is requested after the user taps Start. If access is denied or restricted, Camera GPS Link remains disconnected and offers **Review Location Permission**.
 
 When Continue in Background is selected but only When-In-Use permission is available:
 
@@ -77,7 +77,7 @@ The app retains the verified modern Sony location flow:
 5. send periodic `DD11` location packets;
 6. clean up with `DD31 = 00` and `DD30 = 00`.
 
-`DD21` controls whether SonyGeoTag sends the 95-byte timezone-capable packet or the 91-byte packet. Protocol fields remain in Diagnostics rather than the primary shooting workflow.
+`DD21` controls whether Camera GPS Link sends the 95-byte timezone-capable packet or the 91-byte packet. Protocol fields remain in Diagnostics rather than the primary shooting workflow.
 
 ## Build and test
 
@@ -109,6 +109,7 @@ A physical iPhone is still required to validate real CoreBluetooth behavior, bac
 
 ## Platform and accessibility
 
+- Bundle identifier: `dev.narumi.cameragpslink`.
 - Deployment target: iOS 17 or later.
 - Supported native device family: iPhone.
 - Supported orientations: portrait and landscape.

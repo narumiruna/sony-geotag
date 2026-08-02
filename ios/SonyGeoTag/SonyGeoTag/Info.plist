@@ -4,10 +4,12 @@
 <dict>
   <key>BGTaskSchedulerPermittedIdentifiers</key>
   <array>
-    <string>com.narumi.SonyGeoTag.refresh</string>
+    <string>dev.narumi.cameragpslink.refresh</string>
   </array>
   <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
+  <key>CFBundleDisplayName</key>
+  <string>Camera GPS Link</string>
   <key>CFBundleExecutable</key>
   <string>$(EXECUTABLE_NAME)</string>
   <key>CFBundleIdentifier</key>
@@ -25,15 +27,15 @@
   <key>LSRequiresIPhoneOS</key>
   <true/>
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>Sony GeoTag uses Bluetooth to send GPS location updates to your Sony camera.</string>
+  <string>Camera GPS Link uses Bluetooth to send GPS location updates to a compatible camera.</string>
   <key>NSBluetoothPeripheralUsageDescription</key>
-  <string>Sony GeoTag uses Bluetooth to send GPS location updates to your Sony camera.</string>
+  <string>Camera GPS Link uses Bluetooth to send GPS location updates to a compatible camera.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
-  <string>Sony GeoTag uses your location to geotag photos captured by your Sony camera.</string>
+  <string>Camera GPS Link uses your location to geotag new photos captured by a compatible camera.</string>
   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-  <string>Sony GeoTag can keep sending GPS updates to your Sony camera while you are taking photos.</string>
+  <string>Camera GPS Link can keep sending GPS updates to a compatible camera while you are taking photos.</string>
   <key>NSLocationAlwaysUsageDescription</key>
-  <string>Sony GeoTag can keep sending GPS updates to your Sony camera while you are taking photos.</string>
+  <string>Camera GPS Link can keep sending GPS updates to a compatible camera while you are taking photos.</string>
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>

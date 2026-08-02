@@ -18,7 +18,7 @@ struct ContentView: View {
                     DiagnosticsView(appModel: appModel)
                 }
             )
-            .navigationTitle("Sony GeoTag")
+            .navigationTitle("Camera GPS Link")
             .sheet(isPresented: $showsSettings) {
                 LinkSettingsView(current: appModel.settings) { settings in
                     appModel.applySettings(settings)

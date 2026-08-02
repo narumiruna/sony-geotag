@@ -195,7 +195,7 @@ final class SonyGeoTagAppModel: ObservableObject {
     private let settingsStore: LinkSettingsStoring
     private let now: () -> Date
     private let openSettingsAction: () -> Void
-    private let backgroundRefreshIdentifier = "com.narumi.SonyGeoTag.refresh"
+    private let backgroundRefreshIdentifier = "dev.narumi.cameragpslink.refresh"
     private var pendingStart = false
     private var isForeground = true
     private var lastHandledForeground: Bool?
