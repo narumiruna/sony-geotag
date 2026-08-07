@@ -21,6 +21,7 @@ from sonygeotag.ble_probe import read_gatt_values
 from sonygeotag.ble_probe import scan_devices
 from sonygeotag.camera_snapshot import CameraInfoSessionError
 from sonygeotag.camera_snapshot import capture_camera_info
+from sonygeotag.monitor_tui import run_camera_monitor_tui
 from sonygeotag.sony_info import CameraInfoSnapshot
 from sonygeotag.sony_location import SonyLocationSyncRun
 from sonygeotag.sony_location import create_location_packet
@@ -180,6 +181,32 @@ def camera_info(
         return
 
     _print_camera_info_text(result, include_raw=include_raw, show_sensitive=show_sensitive)
+
+
+@app.command()
+def monitor(
+    interval: Annotated[
+        float,
+        typer.Option("--interval", "-i", min=0.5, help="Seconds between read-only status polls."),
+    ] = 2.0,
+    duration: Annotated[
+        float,
+        typer.Option("--duration", "-d", min=0.0, help="Run time in seconds; 0 runs until quit."),
+    ] = 0.0,
+    timeout: TimeoutOption = 10.0,
+    connect_timeout: ConnectTimeoutOption = 25.0,
+    target: TargetOption = None,
+    pair: PairOption = False,
+) -> None:
+    """Open a live, read-only Textual dashboard for camera status."""
+    run_camera_monitor_tui(
+        targets=normalize_targets(target),
+        scan_timeout=timeout,
+        connect_timeout=connect_timeout,
+        poll_interval=interval,
+        pair=pair,
+        duration=duration or None,
+    )
 
 
 @app.command("notify-log")
@@ -419,8 +446,7 @@ def _print_camera_info_text(
     }
     category_order = tuple(category_labels)
     grouped = {
-        category: [item for item in result.characteristics if item.category == category]
-        for category in category_order
+        category: [item for item in result.characteristics if item.category == category] for category in category_order
     }
     extra_categories = sorted({item.category for item in result.characteristics} - set(category_order))
     for category in (*category_order, *extra_categories):
@@ -447,10 +473,7 @@ def _print_camera_info_text(
                 typer.echo(f"  error={item.error}")
 
     counts = result.to_dict(include_raw=False, show_sensitive=False)["counts"]
-    typer.echo(
-        "\nResults: "
-        + ", ".join(f"{status}={count}" for status, count in counts.items())
-    )
+    typer.echo("\nResults: " + ", ".join(f"{status}={count}" for status, count in counts.items()))
 
 
 def _print_notification_event(event: NotificationEvent, text: bool) -> None:

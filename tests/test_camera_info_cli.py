@@ -140,3 +140,35 @@ def test_camera_info_returns_exit_2_for_ble_session_failure_without_traceback(mo
     assert result.exit_code == 2
     assert "BLE camera-info session failed" in result.stderr
     assert "Traceback" not in result.output
+
+
+def test_monitor_command_launches_textual_dashboard_with_normalized_options(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(cli, "run_camera_monitor_tui", lambda **kwargs: calls.append(kwargs))
+
+    result = runner.invoke(
+        cli.app,
+        ["monitor", "--target", "ILCE-7CM2", "--interval", "1.5", "--duration", "12", "--pair"],
+    )
+
+    assert result.exit_code == 0
+    assert calls == [
+        {
+            "targets": ("ILCE-7CM2",),
+            "scan_timeout": 10.0,
+            "connect_timeout": 25.0,
+            "poll_interval": 1.5,
+            "pair": True,
+            "duration": 12.0,
+        }
+    ]
+
+
+def test_monitor_zero_duration_runs_until_quit(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(cli, "run_camera_monitor_tui", lambda **kwargs: calls.append(kwargs))
+
+    result = runner.invoke(cli.app, ["monitor"])
+
+    assert result.exit_code == 0
+    assert calls[0]["duration"] is None

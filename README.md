@@ -48,6 +48,12 @@ uv run sonygeotag camera-info --target ILCE-7CM2 --pair
 uv run sonygeotag camera-info --target ILCE-7CM2 --pair --json
 ```
 
+Open a live, read-only Textual dashboard (press `q` or `Ctrl+C` to quit):
+
+```bash
+uv run sonygeotag monitor --target ILCE-7CM2 --pair
+```
+
 Encode a Sony `DD11` GPS packet without touching BLE:
 
 ```bash
@@ -81,6 +87,20 @@ uv run sonygeotag camera-info --target ILCE-7CM2 --pair --json --include-raw --s
 Sensitive values include the CoreBluetooth address, SSID, BSSID, Wi-Fi password, FTP profile names, opaque identifiers, and unknown proprietary payloads. Avoid saving or sharing output produced with `--show-sensitive`. The command never activates Wi-Fi; credentials are only readable if the camera is already in a state that exposes them.
 
 JSON schema v1 contains `schema_version`, `captured_at`, redacted `device` metadata, parsed advertisement fields, a summary, decode-status counts, and one result per readable characteristic. Decode statuses are `decoded`, `partial`, `unknown`, `unavailable`, and `error`; confidence is reported separately as `verified`, `referenced`, `tentative`, or `unknown`.
+
+## Live camera monitor
+
+The `monitor` command keeps one BLE connection open and polls a focused set of readable characteristics. It displays battery, storage, recording/streaming, Wi-Fi, remote-control availability, and location-link state. If the connection drops, it returns to scanning automatically. It never performs an application-level GATT write or notification subscription.
+
+```bash
+# Poll every two seconds until q or Ctrl+C
+uv run sonygeotag monitor --target ILCE-7CM2 --interval 2 --pair
+
+# Run for 60 seconds, useful for scripted checks
+uv run sonygeotag monitor --target ILCE-7CM2 --duration 60 --pair
+```
+
+You can also launch it with `just ble-monitor` when `just` is installed.
 
 ## BLE probe commands
 

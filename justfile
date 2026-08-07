@@ -118,6 +118,10 @@ ble-gatt target="ILCE-7CM2":
 ble-info target="ILCE-7CM2":
     uv run sonygeotag camera-info --target {{target}} --timeout 15 --pair
 
+# Open the live read-only camera status TUI
+ble-monitor target="ILCE-7CM2" interval="2":
+    uv run sonygeotag monitor --target {{target}} --interval {{interval}} --pair
+
 # Subscribe to notifications from the camera
 ble-notify target="ILCE-7CM2" duration="60":
     uv run sonygeotag notify-log --target {{target}} --duration {{duration}}
