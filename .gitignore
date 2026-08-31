@@ -139,8 +139,8 @@ dmypy.json
 
 # Project
 # Camera evidence images stay local; commit only sanitized numeric evidence.
-/*.HIF
-/*.HEIF
-/*.HEIC
-/*.JPG
-/*.JPEG
+/*.[Hh][Ii][Ff]
+/*.[Hh][Ee][Ii][Ff]
+/*.[Hh][Ee][Ii][Cc]
+/*.[Jj][Pp][Gg]
+/*.[Jj][Pp][Ee][Gg]

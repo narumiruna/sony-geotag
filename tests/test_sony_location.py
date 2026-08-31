@@ -52,6 +52,7 @@ class FakeClient:
         services: tuple[FakeService, ...],
         values: dict[str, bytes],
         fail_writes: set[tuple[str, bytes]] | None = None,
+        fail_writes_after: dict[str, int] | None = None,
         cancel_write: tuple[str, bytes] | None = None,
         hang_writes: set[tuple[str, bytes]] | None = None,
         hang_write_uuids: set[str] | None = None,
@@ -60,6 +61,8 @@ class FakeClient:
         self.services = services
         self.values = values
         self.fail_writes = fail_writes or set()
+        self.fail_writes_after = fail_writes_after or {}
+        self.write_attempts: dict[str, int] = {}
         self.cancel_write = cancel_write
         self.hang_writes = hang_writes or set()
         self.hang_write_uuids = hang_write_uuids or set()
@@ -88,11 +91,12 @@ class FakeClient:
         assert response is True
         uuid = self._uuid(characteristic)
         self.operations.append(("write", uuid, data))
+        self.write_attempts[uuid] = self.write_attempts.get(uuid, 0) + 1
         if (uuid, data) == self.cancel_write:
             raise asyncio.CancelledError
         if (uuid, data) in self.hang_writes or uuid in self.hang_write_uuids:
             await asyncio.sleep(3600)
-        if (uuid, data) in self.fail_writes:
+        if (uuid, data) in self.fail_writes or self.write_attempts[uuid] > self.fail_writes_after.get(uuid, 10**9):
             raise OSError("injected write failure")
 
     async def start_notify(self, characteristic: object, _callback: object) -> None:
@@ -168,6 +172,8 @@ def run_sync(
     model: str,
     version: int,
     allow_experimental: bool = False,
+    duration: float = 0,
+    interval: float = 1,
 ):
     firmware = client.values[FIRMWARE_VERSION_UUID].decode()
     profile = resolve_location_profile(
@@ -187,8 +193,8 @@ def run_sync(
             connect_timeout=1,
             latitude=35.0,
             longitude=139.0,
-            duration=0,
-            interval=1,
+            duration=duration,
+            interval=interval,
             pair=False,
             allow_experimental=allow_experimental,
             approval_key=approval_key if allow_experimental else None,
@@ -219,6 +225,7 @@ def test_historical_a7c2_modern_flow_requires_requalification_approval_and_prese
     result = run_sync(client, model="ILCE-7CM2", version=101, allow_experimental=True)
 
     assert result is not None and result.success
+    assert result.location_loop_completed is True
     assert [operation.name for operation in result.operations] == [
         "start_dd01_notify",
         "write_dd30_lock",
@@ -425,6 +432,31 @@ def test_pairing_action_requires_identity_scoped_experimental_approval() -> None
 
     assert approved is not None and approved.operation.error is None
     assert write_values(approved_client) == [(PAIRING_INIT_UUID, bytes.fromhex("06 08 01 00 00 00 00"))]
+
+
+def test_later_dd11_failure_makes_incomplete_session_unsuccessful() -> None:
+    client = FakeClient(
+        services=services(modern=True, notify=False),
+        values=values("ILCE-7M4", "4.00"),
+        fail_writes_after={LOCATION_DATA_WRITE_UUID: 1},
+    )
+
+    result = run_sync(
+        client,
+        model="ILCE-7M4",
+        version=101,
+        allow_experimental=True,
+        duration=60,
+        interval=0,
+    )
+
+    assert result is not None
+    assert result.packets_sent == 1
+    assert result.write_succeeded is True
+    assert result.location_loop_completed is False
+    assert result.success is False
+    dd11_operations = [operation for operation in result.operations if operation.name == "write_dd11_location"]
+    assert [operation.error for operation in dd11_operations] == [None, "OSError"]
 
 
 def test_cleanup_failure_makes_overall_session_unsuccessful() -> None:

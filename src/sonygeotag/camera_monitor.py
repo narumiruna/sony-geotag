@@ -152,11 +152,11 @@ async def stream_camera_status(
         emit(MonitorPhase.CONNECTING, f"Connecting to {scanned.observation.name or 'camera'}")
         try:
             async with client_factory(scanned.device, timeout=connect_timeout, pair=pair) as client:
-                static_readings = await _read_selected(client, STATIC_CHARACTERISTIC_UUIDS)
+                static_readings = await _read_selected(client, STATIC_CHARACTERISTIC_UUIDS, connect_timeout)
                 while not _finished(started_at, duration, poll_count, max_polls, clock):
                     if getattr(client, "is_connected", True) is False:
                         raise ConnectionError("Camera disconnected")
-                    dynamic_readings = await _read_selected(client, DYNAMIC_CHARACTERISTIC_UUIDS)
+                    dynamic_readings = await _read_selected(client, DYNAMIC_CHARACTERISTIC_UUIDS, connect_timeout)
                     last_readings = (*static_readings, *dynamic_readings)
                     poll_count += 1
                     emit(MonitorPhase.CONNECTED, "Read-only BLE session active")
@@ -170,7 +170,11 @@ async def stream_camera_status(
     emit(MonitorPhase.STOPPED, "Monitor stopped")
 
 
-async def _read_selected(client: object, selected_uuids: frozenset[str]) -> tuple[DecodedCharacteristic, ...]:
+async def _read_selected(
+    client: object,
+    selected_uuids: frozenset[str],
+    read_timeout: float,
+) -> tuple[DecodedCharacteristic, ...]:
     readings: list[DecodedCharacteristic] = []
     typed_client = cast("MonitorClient", client)
     for service in typed_client.services:
@@ -181,7 +185,12 @@ async def _read_selected(client: object, selected_uuids: frozenset[str]) -> tupl
             value: bytes | None = None
             error_text: str | None = None
             try:
-                value = bytes(await typed_client.read_gatt_char(characteristic))
+                value = bytes(
+                    await asyncio.wait_for(
+                        typed_client.read_gatt_char(characteristic),
+                        timeout=read_timeout,
+                    )
+                )
             except (BleakError, TimeoutError, OSError) as error:
                 error_text = f"{type(error).__name__}: {error}"
             readings.append(

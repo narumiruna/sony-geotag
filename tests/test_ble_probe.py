@@ -1,7 +1,14 @@
+import asyncio
+from typing import cast
+
+from bleak import BleakClient
+from bleak.backends.characteristic import BleakGATTCharacteristic
+
 from sonygeotag.ble_probe import DEFAULT_TARGETS
 from sonygeotag.ble_probe import CharacteristicInfo
 from sonygeotag.ble_probe import ObservedDevice
 from sonygeotag.ble_probe import ReadValue
+from sonygeotag.ble_probe import _read_characteristic
 from sonygeotag.ble_probe import bytes_to_hex
 from sonygeotag.ble_probe import manufacturer_data_to_dict
 from sonygeotag.ble_probe import matches_characteristic_filters
@@ -70,6 +77,24 @@ def test_read_value_to_dict_renders_hex_payload() -> None:
     assert read_value.to_dict()["value_hex"] == "01 02"
     assert read_value.to_dict()["value_len"] == 2
     assert read_value.to_dict()["error"] is None
+
+
+def test_stalled_gatt_dump_read_is_bounded() -> None:
+    class HangingClient:
+        async def read_gatt_char(self, _characteristic: object) -> bytes:
+            await asyncio.sleep(3600)
+            return b""
+
+    value, error = asyncio.run(
+        _read_characteristic(
+            client=cast("BleakClient", HangingClient()),
+            characteristic=cast("BleakGATTCharacteristic", object()),
+            operation_timeout=0.01,
+        )
+    )
+
+    assert value is None
+    assert error == "TimeoutError: "
 
 
 def test_notification_event_handles_characteristic_like_sender() -> None:

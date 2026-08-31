@@ -35,10 +35,17 @@ class FakeService:
 
 
 class StrictMonitorClient:
-    def __init__(self, services: tuple[FakeService, ...], values: dict[str, bytes], operations: list[str]) -> None:
+    def __init__(
+        self,
+        services: tuple[FakeService, ...],
+        values: dict[str, bytes],
+        operations: list[str],
+        hang_uuids: set[str] | None = None,
+    ) -> None:
         self.services = services
         self.values = values
         self.operations = operations
+        self.hang_uuids = hang_uuids or set()
         self.is_connected = True
 
     async def __aenter__(self) -> StrictMonitorClient:
@@ -50,6 +57,8 @@ class StrictMonitorClient:
 
     async def read_gatt_char(self, characteristic: FakeCharacteristic) -> bytes:
         self.operations.append(f"read:{characteristic.uuid}")
+        if characteristic.uuid in self.hang_uuids:
+            await asyncio.sleep(3600)
         return self.values[characteristic.uuid]
 
     async def write_gatt_char(self, *_args: object, **_kwargs: object) -> None:
@@ -138,3 +147,33 @@ def test_monitor_keeps_one_connection_and_polls_dynamic_values_without_writes() 
     assert operations.count(f"read:{LOCATION_LOCK_UUID}") == 2
     assert operations[0] == "connect"
     assert operations[-1] == "disconnect"
+
+
+def test_monitor_bounds_stalled_characteristic_reads_and_records_timeout() -> None:
+    services = (FakeService(CAMERA_CONTROL_SERVICE, (FakeCharacteristic(BATTERY_UUID, 3),)),)
+    operations: list[str] = []
+    updates: list[MonitorUpdate] = []
+    client = StrictMonitorClient(services, {}, operations, hang_uuids={BATTERY_UUID})
+
+    async def find_device(**_kwargs: object) -> ScannedDevice:
+        return scanned_camera()
+
+    asyncio.run(
+        stream_camera_status(
+            targets=("ILCE-7CM2",),
+            scan_timeout=1,
+            connect_timeout=0.01,
+            poll_interval=0,
+            pair=False,
+            on_update=updates.append,
+            find_device=find_device,
+            client_factory=lambda *_args, **_kwargs: client,
+            max_polls=1,
+        )
+    )
+
+    connected = next(update for update in updates if update.phase is MonitorPhase.CONNECTED)
+    assert connected.read_error_count == 1
+    assert connected.readings[0].error == "TimeoutError: "
+    assert updates[-1].phase is MonitorPhase.STOPPED
+    assert operations == ["connect", f"read:{BATTERY_UUID}", "disconnect"]
