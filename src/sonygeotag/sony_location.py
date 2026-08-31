@@ -706,6 +706,9 @@ async def _write_location_loop(
     completed = False
     deadline = time.monotonic() + duration
     while True:
+        if packets_sent > 0 and time.monotonic() >= deadline:
+            completed = True
+            break
         packet = create_location_packet(
             latitude=latitude,
             longitude=longitude,

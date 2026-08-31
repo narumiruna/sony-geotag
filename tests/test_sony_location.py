@@ -459,6 +459,29 @@ def test_later_dd11_failure_makes_incomplete_session_unsuccessful() -> None:
     assert [operation.error for operation in dd11_operations] == [None, "OSError"]
 
 
+def test_elapsed_window_completes_without_an_extra_dd11_write() -> None:
+    client = FakeClient(
+        services=services(modern=True, notify=False),
+        values=values("ILCE-7M4", "4.00"),
+        fail_writes_after={LOCATION_DATA_WRITE_UUID: 1},
+    )
+
+    result = run_sync(
+        client,
+        model="ILCE-7M4",
+        version=101,
+        allow_experimental=True,
+        duration=0.01,
+        interval=1,
+    )
+
+    assert result is not None
+    assert result.packets_sent == 1
+    assert result.location_loop_completed is True
+    assert result.success is True
+    assert client.write_attempts[LOCATION_DATA_WRITE_UUID] == 1
+
+
 def test_cleanup_failure_makes_overall_session_unsuccessful() -> None:
     client = FakeClient(
         services=services(modern=True, notify=False),
