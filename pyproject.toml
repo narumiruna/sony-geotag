@@ -1,23 +1,32 @@
 [project]
-name            = "pythontemplate"
+name            = "sonygeotag"
 version         = "0.0.0"
-description     = ""
+description     = "Sony Alpha BLE discovery, diagnostics, and geotagging tools"
 readme          = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors         = [{ name = "narumi", email = "toucans-cutouts0f@icloud.com" }]
 dependencies    = [
-  "typer>=0.27.1",
+  "bleak>=3.0.2",
+  "pillow>=11.3.0",
+  "pillow-heif>=1.1.0",
+  "textual>=8.2.8",
+  "typer>=0.26.8",
 ]
 
 [project.scripts]
-pythontemplate = "pythontemplate.cli:app"
+sonygeotag = "sonygeotag.cli:app"
+
+[project.urls]
+Homepage   = "https://github.com/narumiruna/sony-geotag"
+Issues     = "https://github.com/narumiruna/sony-geotag/issues"
+Repository = "https://github.com/narumiruna/sony-geotag"
 
 [dependency-groups]
 dev = [
   "pytest>=9.1.1",
   "pytest-cov>=7.1.0",
-  "ruff>=0.16.2",
-  "ty>=0.0.71",
+  "ruff>=0.15.20",
+  "ty>=0.0.57",
 ]
 
 [build-system]

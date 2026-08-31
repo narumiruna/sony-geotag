@@ -136,3 +136,11 @@ dmypy.json
 
 # Codex CLI
 .codex
+
+# Project
+# Camera evidence images stay local; commit only sanitized numeric evidence.
+/*.HIF
+/*.HEIF
+/*.HEIC
+/*.JPG
+/*.JPEG
