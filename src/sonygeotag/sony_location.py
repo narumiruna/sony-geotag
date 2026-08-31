@@ -106,6 +106,7 @@ class SonyLocationSyncRun:
     compatibility: SonyCompatibilityEntry
     dd21_mode: SonyDD21Mode | None
     packets_sent: int
+    location_loop_completed: bool
     operations: tuple[SonyGattOperation, ...]
     notifications: tuple[NotificationEvent, ...]
     approval_required: bool
@@ -118,7 +119,7 @@ class SonyLocationSyncRun:
 
     @property
     def success(self) -> bool:
-        return self.write_succeeded and self.cleanup_diagnostic is None
+        return self.write_succeeded and self.location_loop_completed and self.cleanup_diagnostic is None
 
     @property
     def include_timezone(self) -> bool:
@@ -147,6 +148,7 @@ class SonyLocationSyncRun:
             "dd21_mode": self.dd21_mode.to_dict() if self.dd21_mode is not None else None,
             "include_timezone": self.include_timezone,
             "packets_sent": self.packets_sent,
+            "location_loop_completed": self.location_loop_completed,
             "operations": [operation.to_dict() for operation in self.operations],
             "notifications": [
                 {
@@ -185,6 +187,7 @@ async def sync_location(
     operations: list[SonyGattOperation] = []
     notifications: list[NotificationEvent] = []
     packets_sent = 0
+    location_loop_completed = False
     dd21_mode: SonyDD21Mode | None = None
     cleanup_diagnostic: str | None = None
 
@@ -231,6 +234,7 @@ async def sync_location(
                 compatibility=compatibility,
                 dd21_mode=None,
                 packets_sent=0,
+                location_loop_completed=False,
                 operations=operations,
                 notifications=notifications,
                 approval_required=approval_required,
@@ -250,6 +254,7 @@ async def sync_location(
             interval=interval,
         )
         packets_sent = outcome.packets_sent
+        location_loop_completed = outcome.location_loop_completed
         dd21_mode = outcome.dd21_mode
         cleanup_diagnostic = outcome.cleanup_diagnostic
 
@@ -261,6 +266,7 @@ async def sync_location(
         compatibility=compatibility,
         dd21_mode=dd21_mode,
         packets_sent=packets_sent,
+        location_loop_completed=location_loop_completed,
         operations=operations,
         notifications=notifications,
         approval_required=approval_required,
@@ -397,7 +403,14 @@ class _SetupState:
 class _SessionOutcome:
     dd21_mode: SonyDD21Mode | None
     packets_sent: int
+    location_loop_completed: bool
     cleanup_diagnostic: str | None
+
+
+@dataclass(frozen=True)
+class _LocationWriteOutcome:
+    packets_sent: int
+    completed: bool
 
 
 async def _execute_location_session(
@@ -414,6 +427,7 @@ async def _execute_location_session(
 ) -> _SessionOutcome:
     state = _SetupState()
     packets_sent = 0
+    location_loop_completed = False
     cleanup_diagnostic: str | None = None
     try:
         await _run_setup(
@@ -429,7 +443,7 @@ async def _execute_location_session(
             state.dd30_confirmed,
             state.dd31_confirmed,
         ):
-            packets_sent = await _write_location_loop(
+            write_outcome = await _write_location_loop(
                 client=client,
                 characteristic=endpoints[LOCATION_DATA_WRITE_UUID.lower()],
                 operations=operations,
@@ -439,6 +453,8 @@ async def _execute_location_session(
                 interval=interval,
                 include_timezone=state.dd21_mode.include_timezone,
             )
+            packets_sent = write_outcome.packets_sent
+            location_loop_completed = write_outcome.completed
     finally:
         cleanup_diagnostic = await _run_cleanup_protected(
             client=client,
@@ -447,7 +463,7 @@ async def _execute_location_session(
             notifications=notifications,
             state=state,
         )
-    return _SessionOutcome(state.dd21_mode, packets_sent, cleanup_diagnostic)
+    return _SessionOutcome(state.dd21_mode, packets_sent, location_loop_completed, cleanup_diagnostic)
 
 
 async def _run_setup(
@@ -685,10 +701,14 @@ async def _write_location_loop(
     duration: float,
     interval: float,
     include_timezone: bool,
-) -> int:
+) -> _LocationWriteOutcome:
     packets_sent = 0
+    completed = False
     deadline = time.monotonic() + duration
     while True:
+        if packets_sent > 0 and time.monotonic() >= deadline:
+            completed = True
+            break
         packet = create_location_packet(
             latitude=latitude,
             longitude=longitude,
@@ -719,9 +739,10 @@ async def _write_location_loop(
         packets_sent += 1
         remaining = deadline - time.monotonic()
         if remaining <= 0:
+            completed = True
             break
         await asyncio.sleep(min(interval, remaining))
-    return packets_sent
+    return _LocationWriteOutcome(packets_sent=packets_sent, completed=completed)
 
 
 async def _start_dd01_notifications(
@@ -832,6 +853,7 @@ def _run_result(
     compatibility: SonyCompatibilityEntry,
     dd21_mode: SonyDD21Mode | None,
     packets_sent: int,
+    location_loop_completed: bool,
     operations: list[SonyGattOperation],
     notifications: list[NotificationEvent],
     approval_required: bool,
@@ -846,6 +868,7 @@ def _run_result(
         compatibility=compatibility,
         dd21_mode=dd21_mode,
         packets_sent=packets_sent,
+        location_loop_completed=location_loop_completed,
         operations=tuple(operations),
         notifications=tuple(notifications),
         approval_required=approval_required,

@@ -282,7 +282,11 @@ async def read_gatt_values(
                     characteristic.uuid, characteristic_filters
                 ):
                     continue
-                value, error = await _read_characteristic(client=client, characteristic=characteristic)
+                value, error = await _read_characteristic(
+                    client=client,
+                    characteristic=characteristic,
+                    operation_timeout=connect_timeout,
+                )
                 values.append(
                     ReadValue(
                         service_uuid=service.uuid,
@@ -356,9 +360,15 @@ async def _start_notify(
 async def _read_characteristic(
     client: BleakClient,
     characteristic: BleakGATTCharacteristic,
+    operation_timeout: float,
 ) -> tuple[bytes | None, str | None]:
     try:
-        value = bytes(await client.read_gatt_char(characteristic))
+        value = bytes(
+            await asyncio.wait_for(
+                client.read_gatt_char(characteristic),
+                timeout=operation_timeout,
+            )
+        )
     except (BleakError, TimeoutError, OSError) as error:
         return None, f"{type(error).__name__}: {error}"
     return value, None
