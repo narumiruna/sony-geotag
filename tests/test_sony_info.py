@@ -1,6 +1,11 @@
+import pytest
+
+from sonygeotag import sony_info
 from sonygeotag.sony_info import CameraInfoSnapshot
+from sonygeotag.sony_info import CharacteristicSpec
 from sonygeotag.sony_info import Confidence
 from sonygeotag.sony_info import DecodeStatus
+from sonygeotag.sony_info import ParseResult
 from sonygeotag.sony_info import Sensitivity
 from sonygeotag.sony_info import decode_characteristic
 from sonygeotag.sony_info import snapshot_summary
@@ -375,3 +380,124 @@ def test_snapshot_schema_redacts_corebluetooth_address() -> None:
     assert hidden["device"]["address_redacted"] is True
     assert shown["device"]["address"] == "00000000-1111-2222-3333-444444444444"
     assert hidden["summary"]["firmware_version"] == "2.01"
+
+
+@pytest.mark.parametrize("include_raw", [False, True])
+@pytest.mark.parametrize("show_sensitive", [False, True])
+@pytest.mark.parametrize("sensitivity", [Sensitivity.PUBLIC, Sensitivity.SECRET])
+@pytest.mark.parametrize(
+    ("outcome", "value", "error", "status", "expected_fields", "warning", "expected_error", "retained_value"),
+    [
+        ("read-error", b"abc", "TimeoutError", "unavailable", {}, None, "TimeoutError", None),
+        ("read-error", None, "OSError", "error", {}, None, "OSError", None),
+        ("read-error", b"abc", "", "error", {}, None, "", None),
+        ("missing", None, None, "error", {}, None, "Characteristic returned no value.", None),
+        (
+            "unknown",
+            b"abc",
+            None,
+            "unknown",
+            {},
+            "No evidence-backed decoder is registered for this payload.",
+            None,
+            b"abc",
+        ),
+        ("decoded", b"abc", None, "decoded", {"sample": "value"}, None, None, b"abc"),
+        ("partial", b"abc", None, "partial", {"sample": None}, "Partial fixture.", None, b"abc"),
+        ("exception", b"abc", None, "partial", {}, "Malformed payload: ValueError: invalid fixture", None, b"abc"),
+    ],
+)
+def test_decode_outcomes_preserve_complete_serialization(
+    monkeypatch,
+    include_raw,
+    show_sensitive,
+    sensitivity,
+    outcome,
+    value,
+    error,
+    status,
+    expected_fields,
+    warning,
+    expected_error,
+    retained_value,
+) -> None:
+    uuid = "0000ccfe-0000-1000-8000-00805f9b34fb"
+    decoded_values = []
+
+    def decoder(payload):
+        decoded_values.append(payload)
+        if outcome == "exception":
+            raise ValueError("invalid fixture")
+        if outcome == "partial":
+            return ParseResult(DecodeStatus.PARTIAL, {"sample": None}, "Partial fixture.")
+        return ParseResult(DecodeStatus.DECODED, {"sample": "value"})
+
+    monkeypatch.setitem(
+        sony_info.CHARACTERISTIC_SPECS,
+        uuid,
+        CharacteristicSpec(
+            name="Fixture",
+            category="camera_status",
+            confidence=Confidence.TENTATIVE,
+            sensitivity=sensitivity,
+            decoder=None if outcome == "unknown" else decoder,
+        ),
+    )
+    result = decode_characteristic(
+        service_uuid=CAMERA_CONTROL_SERVICE.upper(),
+        uuid=uuid.upper(),
+        handle=123,
+        value=value,
+        error=error,
+    )
+
+    redacted = sensitivity is Sensitivity.SECRET and not show_sensitive
+    raw_allowed = include_raw and (sensitivity is Sensitivity.PUBLIC or show_sensitive)
+    fields = dict.fromkeys(expected_fields) if redacted else expected_fields
+    assert result.value == retained_value
+    assert decoded_values == ([value] if outcome in {"decoded", "partial", "exception"} else [])
+    assert result.to_dict(include_raw=include_raw, show_sensitive=show_sensitive) == {
+        "service_uuid": CAMERA_CONTROL_SERVICE.upper(),
+        "uuid": uuid,
+        "handle": 123,
+        "name": "Fixture",
+        "category": "camera_status",
+        "status": status,
+        "confidence": "tentative",
+        "fields": fields,
+        "value_len": len(retained_value) if retained_value is not None else None,
+        "raw_hex": "61 62 63" if raw_allowed and retained_value is not None else None,
+        "sensitivity": sensitivity.value,
+        "redacted": redacted,
+        "warning": warning,
+        "error": expected_error,
+    }
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        IndexError("truncated"),
+        UnicodeDecodeError("ascii", b"\xff", 0, 1, "invalid"),
+        ValueError("invalid"),
+        OverflowError("large"),
+    ],
+)
+def test_decoder_payload_exceptions_remain_partial_with_raw_value(monkeypatch, error) -> None:
+    uuid = "0000ccfe-0000-1000-8000-00805f9b34fb"
+
+    def decoder(_payload):
+        raise error
+
+    monkeypatch.setitem(
+        sony_info.CHARACTERISTIC_SPECS,
+        uuid,
+        CharacteristicSpec("Fixture", "identity", Confidence.UNKNOWN, Sensitivity.PUBLIC, decoder),
+    )
+    result = decode_characteristic(service_uuid=CAMERA_CONTROL_SERVICE, uuid=uuid, handle=None, value=b"\xff")
+
+    assert result.status is DecodeStatus.PARTIAL
+    assert result.fields == {}
+    assert result.value == b"\xff"
+    assert result.error is None
+    assert result.warning == f"Malformed payload: {type(error).__name__}: {error}"

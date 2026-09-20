@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
 
+import pytest
 from bleak.backends.device import BLEDevice
+from bleak.exc import BleakError
 
 from sonygeotag.ble_probe import ObservedDevice
 from sonygeotag.ble_probe import ScannedDevice
 from sonygeotag.camera_monitor import MonitorPhase
 from sonygeotag.camera_monitor import MonitorUpdate
+from sonygeotag.camera_monitor import _read_selected
 from sonygeotag.camera_monitor import stream_camera_status
 
 CAMERA_CONTROL_SERVICE = "8000cc00-cc00-ffff-ffff-ffffffffffff"
@@ -38,7 +42,7 @@ class StrictMonitorClient:
     def __init__(
         self,
         services: tuple[FakeService, ...],
-        values: dict[str, bytes],
+        values: Mapping[str, bytes | BaseException],
         operations: list[str],
         hang_uuids: set[str] | None = None,
     ) -> None:
@@ -59,7 +63,10 @@ class StrictMonitorClient:
         self.operations.append(f"read:{characteristic.uuid}")
         if characteristic.uuid in self.hang_uuids:
             await asyncio.sleep(3600)
-        return self.values[characteristic.uuid]
+        value = self.values[characteristic.uuid]
+        if isinstance(value, BaseException):
+            raise value
+        return value
 
     async def write_gatt_char(self, *_args: object, **_kwargs: object) -> None:
         raise AssertionError("read-only monitor attempted write_gatt_char")
@@ -177,3 +184,62 @@ def test_monitor_bounds_stalled_characteristic_reads_and_records_timeout() -> No
     assert connected.readings[0].error == "TimeoutError: "
     assert updates[-1].phase is MonitorPhase.STOPPED
     assert operations == ["connect", f"read:{BATTERY_UUID}", "disconnect"]
+
+
+@pytest.mark.parametrize("failure", [BleakError("GATT status 0x9D"), OSError("PRIVATE-ID")])
+def test_selected_reads_preserve_filters_order_and_raw_errors(failure) -> None:
+    services = (
+        FakeService(
+            CAMERA_CONTROL_SERVICE,
+            (
+                FakeCharacteristic(MODEL_UUID, 1),
+                FakeCharacteristic(BATTERY_UUID, 2, ("write",)),
+                FakeCharacteristic(BATTERY_UUID.upper(), 3),
+                FakeCharacteristic(LOCATION_LOCK_UUID, 4),
+            ),
+        ),
+    )
+    operations = []
+    client = StrictMonitorClient(
+        services,
+        {BATTERY_UUID.upper(): failure, LOCATION_LOCK_UUID: b"\x01"},
+        operations,
+    )
+
+    readings = asyncio.run(_read_selected(client, frozenset({BATTERY_UUID, LOCATION_LOCK_UUID}), read_timeout=1))
+
+    assert operations == [f"read:{BATTERY_UUID.upper()}", f"read:{LOCATION_LOCK_UUID}"]
+    assert [reading.uuid for reading in readings] == [BATTERY_UUID, LOCATION_LOCK_UUID]
+    assert readings[0].error == f"{type(failure).__name__}: {failure}"
+    assert readings[1].fields == {"location_locked": True}
+
+
+def test_monitor_read_cancellation_disconnects_without_retrying() -> None:
+    operations = []
+    updates = []
+    client = StrictMonitorClient(
+        (FakeService(CAMERA_CONTROL_SERVICE, (FakeCharacteristic(BATTERY_UUID, 1),)),),
+        {BATTERY_UUID: asyncio.CancelledError()},
+        operations,
+    )
+
+    async def find_device(**_kwargs):
+        return scanned_camera()
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            stream_camera_status(
+                targets=("ILCE-7CM2",),
+                scan_timeout=1,
+                connect_timeout=1,
+                poll_interval=0,
+                pair=False,
+                on_update=updates.append,
+                find_device=find_device,
+                client_factory=lambda *_args, **_kwargs: client,
+                max_polls=1,
+            )
+        )
+
+    assert operations == ["connect", f"read:{BATTERY_UUID}", "disconnect"]
+    assert [update.phase for update in updates] == [MonitorPhase.SCANNING, MonitorPhase.CONNECTING]

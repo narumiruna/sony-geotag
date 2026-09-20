@@ -20,6 +20,7 @@ from sonygeotag.sony_capabilities import SonyGattDescriptor
 from sonygeotag.sony_capabilities import SonyIdentity
 from sonygeotag.sony_capabilities import SonyLocationProfile
 from sonygeotag.sony_capabilities import approved_snapshot_uuids
+from sonygeotag.sony_capabilities import decode_identity_value
 from sonygeotag.sony_capabilities import descriptors_from_services
 from sonygeotag.sony_capabilities import expected_identity_service
 from sonygeotag.sony_capabilities import parse_dd21_mode
@@ -195,16 +196,7 @@ def _approved_endpoints(
     return endpoints
 
 
-def _decode_public_ascii(value: bytes | None) -> str | None:
-    if value is None:
-        return None
-    try:
-        decoded = value.rstrip(b"\x00").decode("ascii").strip()
-    except UnicodeDecodeError:
-        return None
-    if not decoded or any(ord(character) < 0x20 or ord(character) > 0x7E for character in decoded):
-        return None
-    return decoded
+_decode_public_ascii = decode_identity_value
 
 
 def _fallback_model(scanned: ScannedDevice) -> str:

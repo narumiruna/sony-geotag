@@ -14,8 +14,11 @@ from sonygeotag.sony_protocol import LOCATION_CONFIG_READ_UUID
 from sonygeotag.sony_protocol import LOCATION_DATA_WRITE_UUID
 from sonygeotag.sony_protocol import LOCATION_ENABLE_UUID
 from sonygeotag.sony_protocol import LOCATION_LOCK_UUID
+from sonygeotag.sony_protocol import LOCATION_PACKET_SIZE_WITH_TIMEZONE
+from sonygeotag.sony_protocol import LOCATION_PACKET_SIZE_WITHOUT_TIMEZONE
 from sonygeotag.sony_protocol import LOCATION_SERVICE_UUID
 from sonygeotag.sony_protocol import LOCATION_STATUS_NOTIFY_UUID
+from sonygeotag.sony_protocol import PROTOCOL_VERSION_REQUIRES_UNLOCK
 from sonygeotag.sony_protocol import TIME_CORRECTION_UUID
 
 FIRMWARE_VERSION_UUID = "0000cc0a-0000-1000-8000-00805f9b34fb"
@@ -125,6 +128,19 @@ class SonyIdentity:
             "firmware": self.firmware,
             "protocol_version": self.protocol_version,
         }
+
+
+def decode_identity_value(value: bytes | None) -> str | None:
+    """Decode a public model or firmware value used for compatibility approval."""
+    if value is None:
+        return None
+    try:
+        decoded = value.rstrip(b"\x00").decode("ascii").strip()
+    except UnicodeDecodeError:
+        return None
+    if not decoded or any(ord(character) < 0x20 or ord(character) > 0x7E for character in decoded):
+        return None
+    return decoded
 
 
 @dataclass(frozen=True)
@@ -351,7 +367,7 @@ def _resolve_version_shape(
                 **optional,
             )
         return _unsupported(None, "Unknown-version cameras with only the legacy shape are not executable.")
-    if protocol_version >= 65:
+    if protocol_version >= PROTOCOL_VERSION_REQUIRES_UNLOCK:
         if not has_controls:
             return _unsupported(protocol_version, "Protocol >= 65 requires writable DD30 and DD31 controls.")
         return SonyLocationProfile(
@@ -388,7 +404,7 @@ def parse_dd21_mode(payload: bytes) -> SonyDD21Mode:
     include_timezone = bool(payload[4] & 0x02)
     return SonyDD21Mode(
         include_timezone=include_timezone,
-        packet_size=95 if include_timezone else 91,
+        packet_size=LOCATION_PACKET_SIZE_WITH_TIMEZONE if include_timezone else LOCATION_PACKET_SIZE_WITHOUT_TIMEZONE,
         value_hex=payload.hex(" "),
     )
 

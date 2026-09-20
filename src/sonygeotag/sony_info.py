@@ -667,55 +667,26 @@ def decode_characteristic(
     normalized_uuid = uuid.lower()
     spec = CHARACTERISTIC_SPECS.get(normalized_uuid, _default_spec(service_uuid, normalized_uuid))
     if error is not None:
-        return DecodedCharacteristic(
-            service_uuid=service_uuid,
-            uuid=normalized_uuid,
-            handle=handle,
-            name=spec.name,
-            category=spec.category,
-            status=_error_status(error),
-            confidence=spec.confidence,
-            fields={},
-            value=None,
-            sensitivity=spec.sensitivity,
-            error=error,
-        )
-    if value is None:
-        return DecodedCharacteristic(
-            service_uuid=service_uuid,
-            uuid=normalized_uuid,
-            handle=handle,
-            name=spec.name,
-            category=spec.category,
-            status=DecodeStatus.ERROR,
-            confidence=spec.confidence,
-            fields={},
-            value=None,
-            sensitivity=spec.sensitivity,
-            error="Characteristic returned no value.",
-        )
-    if spec.decoder is None:
-        return DecodedCharacteristic(
-            service_uuid=service_uuid,
-            uuid=normalized_uuid,
-            handle=handle,
-            name=spec.name,
-            category=spec.category,
+        parsed = ParseResult(status=_error_status(error), fields={})
+        value = None
+    elif value is None:
+        parsed = ParseResult(status=DecodeStatus.ERROR, fields={})
+        error = "Characteristic returned no value."
+    elif spec.decoder is None:
+        parsed = ParseResult(
             status=DecodeStatus.UNKNOWN,
-            confidence=spec.confidence,
             fields={},
-            value=value,
-            sensitivity=spec.sensitivity,
             warning="No evidence-backed decoder is registered for this payload.",
         )
-    try:
-        parsed = spec.decoder(value)
-    except (IndexError, UnicodeDecodeError, ValueError, OverflowError) as error_value:
-        parsed = ParseResult(
-            status=DecodeStatus.PARTIAL,
-            fields={},
-            warning=f"Malformed payload: {type(error_value).__name__}: {error_value}",
-        )
+    else:
+        try:
+            parsed = spec.decoder(value)
+        except (IndexError, UnicodeDecodeError, ValueError, OverflowError) as error_value:
+            parsed = ParseResult(
+                status=DecodeStatus.PARTIAL,
+                fields={},
+                warning=f"Malformed payload: {type(error_value).__name__}: {error_value}",
+            )
     return DecodedCharacteristic(
         service_uuid=service_uuid,
         uuid=normalized_uuid,
@@ -728,6 +699,7 @@ def decode_characteristic(
         value=value,
         sensitivity=spec.sensitivity,
         warning=parsed.warning,
+        error=error,
     )
 
 

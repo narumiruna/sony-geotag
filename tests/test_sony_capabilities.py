@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC
+from datetime import datetime
+
 import pytest
 
 from sonygeotag import sony_capabilities
@@ -19,6 +22,9 @@ from sonygeotag.sony_protocol import LOCATION_ENABLE_UUID
 from sonygeotag.sony_protocol import LOCATION_LOCK_UUID
 from sonygeotag.sony_protocol import LOCATION_SERVICE_UUID
 from sonygeotag.sony_protocol import LOCATION_STATUS_NOTIFY_UUID
+from sonygeotag.sony_protocol import SONY_COMPANY_ID
+from sonygeotag.sony_protocol import encode_location_packet
+from sonygeotag.sony_protocol import parse_sony_advertisement
 
 
 def descriptor(uuid: str, *properties: str, service: str = LOCATION_SERVICE_UUID) -> SonyGattDescriptor:
@@ -214,7 +220,21 @@ def test_incomplete_discovery_and_registry_block_fail_closed() -> None:
     ],
 )
 def test_dd21_accepts_only_evidence_backed_six_or_seven_byte_frames(payload: bytes, packet_size: int) -> None:
-    assert parse_dd21_mode(payload).packet_size == packet_size
+    mode = parse_dd21_mode(payload)
+    packet = encode_location_packet(
+        latitude=35,
+        longitude=139,
+        date_time=datetime(2026, 9, 21, tzinfo=UTC),
+        include_timezone=mode.include_timezone,
+    )
+
+    assert len(packet) == mode.packet_size == packet_size
+    assert int.from_bytes(packet[:2], "big") == packet_size - 2
+    assert mode.to_dict() == {
+        "include_timezone": packet_size == 95,
+        "packet_size": packet_size,
+        "value_hex": payload.hex(" "),
+    }
 
 
 @pytest.mark.parametrize(
@@ -234,3 +254,37 @@ def test_dd21_accepts_only_evidence_backed_six_or_seven_byte_frames(payload: byt
 def test_dd21_rejects_wrong_length_prefix_flag_and_reserved_bytes(payload: bytes) -> None:
     with pytest.raises(ValueError):
         parse_dd21_mode(payload)
+
+
+@pytest.mark.parametrize(
+    ("version", "modern", "kind", "reason"),
+    [
+        (64, False, "legacy", "Protocol < 65 with complete DD11/DD21 legacy shape and no modern controls."),
+        (65, True, "modern", "Protocol >= 65 and complete modern location shape."),
+        (
+            64,
+            True,
+            "unsupported",
+            "Protocol < 65 unexpectedly exposes modern controls; model-specific evidence is required.",
+        ),
+        (65, False, "unsupported", "Protocol >= 65 requires writable DD30 and DD31 controls."),
+    ],
+)
+def test_advertisement_and_profile_agree_at_unlock_boundary(version, modern, kind, reason) -> None:
+    advertisement = parse_sony_advertisement({SONY_COMPANY_ID: bytes([3, 0, version, 0])})
+    assert advertisement is not None
+    assert advertisement.to_dict() == {
+        "is_camera": True,
+        "protocol_version": version,
+        "requires_unlock": version == 65,
+    }
+
+    profile = resolve_location_profile(
+        protocol_version=advertisement.protocol_version,
+        descriptors=modern_shape() if modern else legacy_shape(),
+        discovery_complete=True,
+    )
+
+    assert profile.kind.value == kind
+    assert profile.reason == reason
+    assert profile.protocol_version == version

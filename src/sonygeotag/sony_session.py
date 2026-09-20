@@ -108,20 +108,7 @@ def create_session_plan(profile: SonyLocationProfile) -> SonyLocationSessionPlan
     return SonyLocationSessionPlan(
         profile=profile.kind,
         setup=tuple(setup),
-        cleanup=(
-            SonySessionAction(
-                name="write_dd31_disable",
-                kind=SonySessionActionKind.WRITE,
-                uuid=LOCATION_ENABLE_UUID,
-                value=b"\x00",
-            ),
-            SonySessionAction(
-                name="write_dd30_unlock",
-                kind=SonySessionActionKind.WRITE,
-                uuid=LOCATION_LOCK_UUID,
-                value=b"\x00",
-            ),
-        ),
+        cleanup=compensation_actions(dd30_acquired=True, dd31_acquired=True),
     )
 
 

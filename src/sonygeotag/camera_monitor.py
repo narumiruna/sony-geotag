@@ -18,6 +18,7 @@ from bleak.exc import BleakError
 from sonygeotag.ble_probe import ObservedDevice
 from sonygeotag.ble_probe import ScannedDevice
 from sonygeotag.ble_probe import find_target_device
+from sonygeotag.ble_probe import read_characteristic
 from sonygeotag.ble_probe import utc_timestamp
 from sonygeotag.sony_info import DecodedCharacteristic
 from sonygeotag.sony_info import DecodeStatus
@@ -182,17 +183,11 @@ async def _read_selected(
             normalized_uuid = characteristic.uuid.lower()
             if normalized_uuid not in selected_uuids or "read" not in characteristic.properties:
                 continue
-            value: bytes | None = None
-            error_text: str | None = None
-            try:
-                value = bytes(
-                    await asyncio.wait_for(
-                        typed_client.read_gatt_char(characteristic),
-                        timeout=read_timeout,
-                    )
-                )
-            except (BleakError, TimeoutError, OSError) as error:
-                error_text = f"{type(error).__name__}: {error}"
+            value, error_text = await read_characteristic(
+                client=typed_client,
+                characteristic=characteristic,
+                operation_timeout=read_timeout,
+            )
             readings.append(
                 decode_characteristic(
                     service_uuid=service.uuid,

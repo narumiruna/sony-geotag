@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
 from typing import Any
+from typing import Protocol
 
 from bleak import BleakClient
 from bleak import BleakScanner
@@ -282,7 +283,7 @@ async def read_gatt_values(
                     characteristic.uuid, characteristic_filters
                 ):
                     continue
-                value, error = await _read_characteristic(
+                value, error = await read_characteristic(
                     client=client,
                     characteristic=characteristic,
                     operation_timeout=connect_timeout,
@@ -357,11 +358,16 @@ async def _start_notify(
     return None
 
 
-async def _read_characteristic(
-    client: BleakClient,
-    characteristic: BleakGATTCharacteristic,
+class GattReader[Characteristic](Protocol):
+    async def read_gatt_char(self, characteristic: Characteristic, /) -> bytes | bytearray: ...
+
+
+async def read_characteristic[Characteristic](
+    client: GattReader[Characteristic],
+    characteristic: Characteristic,
     operation_timeout: float,
 ) -> tuple[bytes | None, str | None]:
+    """Read with a deadline and retain raw diagnostics; cancellation propagates."""
     try:
         value = bytes(
             await asyncio.wait_for(
@@ -372,6 +378,9 @@ async def _read_characteristic(
     except (BleakError, TimeoutError, OSError) as error:
         return None, f"{type(error).__name__}: {error}"
     return value, None
+
+
+_read_characteristic = read_characteristic
 
 
 async def _stop_notify(client: BleakClient, characteristic: BleakGATTCharacteristic) -> None:
