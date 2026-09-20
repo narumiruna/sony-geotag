@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Awaitable
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import replace
+from typing import Any
 from typing import cast
 
 import pytest
@@ -598,3 +600,92 @@ def test_sanitized_result_never_exports_peripheral_id_or_dd11_coordinates() -> N
     assert result.to_dict()["device"]["address"] is None
     dd11 = next(operation for operation in result.to_dict()["operations"] if operation["name"] == "write_dd11_location")
     assert dd11["value_hex"] is None
+
+
+@pytest.mark.parametrize("pairing", [False, True])
+@pytest.mark.parametrize(
+    ("model", "firmware", "name", "local_name", "expected_model"),
+    [
+        (b" ILCE-7M4 \x00", b" 4.00\x00", "ignored", "ignored", "ILCE-7M4"),
+        (b"\xff", b"4.00", "ILCE-7M4", "ignored", "ILCE-7M4"),
+        (b"", b"4.00", None, "ILCE-7M4", "ILCE-7M4"),
+        (b"", b"4.00", None, None, "UNKNOWN"),
+    ],
+)
+def test_identity_sessions_preserve_read_order_fallback_and_approval_keys(
+    pairing, model, firmware, name, local_name, expected_model
+) -> None:
+    client = FakeClient(
+        services=services(modern=True),
+        values={CAMERA_MODEL_UUID: model, FIRMWARE_VERSION_UUID: firmware},
+    )
+    scanned = camera(model="ILCE-7M4", version=101)
+    scanned = replace(scanned, observation=replace(scanned.observation, name=name, local_name=local_name))
+    kwargs: dict[str, Any] = {
+        "targets": ("ILCE-7M4",),
+        "scan_timeout": 1,
+        "connect_timeout": 1,
+        "pair": False,
+        "find_device": finder(scanned),
+        "client_factory": lambda *_args, **_kwargs: client,
+    }
+    if pairing:
+        result = asyncio.run(initialize_pairing(**kwargs, write=False))
+    else:
+        result = asyncio.run(sync_location(**kwargs, latitude=35, longitude=139, duration=0, interval=1))
+
+    assert result is not None
+    assert result.identity.to_dict() == {
+        "model": expected_model,
+        "normalized_model": expected_model,
+        "firmware": "4.00",
+        "protocol_version": 101,
+    }
+    if expected_model == "ILCE-7M4":
+        assert result.approval_key == ("ebfbd2c462231279" if pairing else "e477f8e5ca671fcb")
+    assert client.operations == [
+        ("connect", "", None),
+        ("read", CAMERA_MODEL_UUID, None),
+        ("read", FIRMWARE_VERSION_UUID, None),
+        ("disconnect", "", None),
+    ]
+
+
+@pytest.mark.parametrize("pairing", [False, True])
+@pytest.mark.parametrize("failure", ["missing", "invalid", "timeout"])
+def test_identity_sessions_do_not_authorize_unreadable_firmware(monkeypatch, pairing, failure) -> None:
+    from sonygeotag import sony_location
+
+    monkeypatch.setattr(sony_location, "GATT_OPERATION_TIMEOUT", 0.01)
+    identity_values = {CAMERA_MODEL_UUID: b"ILCE-7M4"}
+    if failure == "invalid":
+        identity_values[FIRMWARE_VERSION_UUID] = b"4.\x0100"
+    client = FakeClient(
+        services=services(modern=True),
+        values=identity_values,
+        hang_read_uuids={FIRMWARE_VERSION_UUID} if failure == "timeout" else set(),
+    )
+    kwargs: dict[str, Any] = {
+        "targets": ("ILCE-7M4",),
+        "scan_timeout": 1,
+        "connect_timeout": 1,
+        "pair": False,
+        "allow_experimental": True,
+        "approval_key": "ebfbd2c462231279" if pairing else "e477f8e5ca671fcb",
+        "find_device": finder(camera(model="ILCE-7M4", version=101)),
+        "client_factory": lambda *_args, **_kwargs: client,
+    }
+    if pairing:
+        result = asyncio.run(initialize_pairing(**kwargs, write=True))
+    else:
+        result = asyncio.run(sync_location(**kwargs, latitude=35, longitude=139, duration=0, interval=1))
+
+    assert result is not None and result.approval_required
+    assert result.identity.firmware is None
+    assert result.approval_key is None
+    assert client.operations == [
+        ("connect", "", None),
+        ("read", CAMERA_MODEL_UUID, None),
+        ("read", FIRMWARE_VERSION_UUID, None),
+        ("disconnect", "", None),
+    ]

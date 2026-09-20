@@ -6,10 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
+import pytest
 from bleak.backends.device import BLEDevice
 
 from sonygeotag.ble_probe import ObservedDevice
 from sonygeotag.ble_probe import ScannedDevice
+from sonygeotag.compatibility_snapshot import _decode_public_ascii
 from sonygeotag.compatibility_snapshot import capture_compatibility_snapshot
 from sonygeotag.sony_capabilities import CAMERA_MODEL_UUID
 from sonygeotag.sony_capabilities import FIRMWARE_VERSION_UUID
@@ -132,3 +134,67 @@ def test_compatibility_snapshot_is_strict_read_only_and_stably_sanitized() -> No
     assert "PRIVATE-PERIPHERAL-ID" not in serialized
     assert "de ad be ef" not in serialized
     assert "cc07" not in serialized
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, None),
+        (b"", None),
+        (b"\x00\x00", None),
+        (b" \t\r\n", None),
+        (b"ILCE-7M4", "ILCE-7M4"),
+        (b"  ILCE-7M4 \x00\x00", "ILCE-7M4"),
+        (b"\t4.00\n\x00", "4.00"),
+        (b"A B", "A B"),
+        (b"A\x00B", None),
+        (b"A\x00 ", None),
+        (b"A\tB", None),
+        (b"A\x1fB", None),
+        (b"A\x7fB", None),
+        (b"\xff", None),
+    ],
+)
+def test_public_identity_ascii_preserves_strict_decoding(value, expected) -> None:
+    assert _decode_public_ascii(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("model", "firmware", "expected_model", "expected_firmware"),
+    [
+        (b" ILCE-7M4 \x00", b" 4.00\x00", "ILCE-7M4", "4.00"),
+        (b"\xff", b"\x00", "ILCE-7CM2", None),
+        (b"", b"4.\x0100", "ILCE-7CM2", None),
+    ],
+)
+def test_snapshot_identity_uses_strict_decoding_and_model_fallback(
+    model, firmware, expected_model, expected_firmware
+) -> None:
+    client = SnapshotClient()
+    client.values[CAMERA_MODEL_UUID] = model
+    client.values[FIRMWARE_VERSION_UUID] = firmware
+
+    result = asyncio.run(
+        capture_compatibility_snapshot(
+            targets=("ILCE-7CM2",),
+            scan_timeout=1,
+            connect_timeout=1,
+            find_device=finder(),
+            client_factory=lambda *_args, **_kwargs: client,
+        )
+    )
+
+    assert result is not None
+    assert result.identity.to_dict() == {
+        "model": expected_model,
+        "normalized_model": expected_model,
+        "firmware": expected_firmware,
+        "protocol_version": 101,
+    }
+    assert client.operations == [
+        "connect",
+        f"read:{CAMERA_MODEL_UUID}",
+        f"read:{FIRMWARE_VERSION_UUID}",
+        f"read:{LOCATION_CONFIG_READ_UUID}",
+        "disconnect",
+    ]

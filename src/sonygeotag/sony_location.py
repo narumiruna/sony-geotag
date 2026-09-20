@@ -29,6 +29,7 @@ from sonygeotag.sony_capabilities import SonyGattDescriptor
 from sonygeotag.sony_capabilities import SonyIdentity
 from sonygeotag.sony_capabilities import SonyLocationProfile
 from sonygeotag.sony_capabilities import SonySupportConfidence
+from sonygeotag.sony_capabilities import decode_identity_value
 from sonygeotag.sony_capabilities import descriptors_from_services
 from sonygeotag.sony_capabilities import experimental_approval_key
 from sonygeotag.sony_capabilities import parse_dd21_mode
@@ -196,10 +197,7 @@ async def sync_location(
         descriptors = descriptors_from_services(services)
         identity_endpoints = _endpoints_for_service(services, CAMERA_CONTROL_SERVICE_UUID)
         location_endpoints = _endpoints_for_service(services, LOCATION_SERVICE_UUID)
-        model = await _read_identity_value(client, identity_endpoints.get(CAMERA_MODEL_UUID.lower()))
-        model = model or _fallback_model(scanned.observation)
-        firmware = await _read_identity_value(client, identity_endpoints.get(FIRMWARE_VERSION_UUID.lower()))
-        identity = SonyIdentity(model=model, firmware=firmware, protocol_version=protocol_version)
+        identity = await _read_identity(client, identity_endpoints, scanned.observation, protocol_version)
         profile, compatibility = resolve_compatible_profile(
             identity=identity,
             protocol_version=protocol_version,
@@ -298,12 +296,7 @@ async def initialize_pairing(
         descriptors = descriptors_from_services(services)
         identity_endpoints = _endpoints_for_service(services, CAMERA_CONTROL_SERVICE_UUID)
         pairing_endpoints = _endpoints_for_service(services, PAIRING_SERVICE_UUID)
-        identity = SonyIdentity(
-            model=await _read_identity_value(client, identity_endpoints.get(CAMERA_MODEL_UUID.lower()))
-            or _fallback_model(scanned.observation),
-            firmware=await _read_identity_value(client, identity_endpoints.get(FIRMWARE_VERSION_UUID.lower())),
-            protocol_version=protocol_version,
-        )
+        identity = await _read_identity(client, identity_endpoints, scanned.observation, protocol_version)
         profile, compatibility = resolve_compatible_profile(
             identity=identity,
             protocol_version=protocol_version,
@@ -591,6 +584,18 @@ async def _bounded_stop_notifications(
         )
 
 
+async def _read_identity(
+    client: SonyBLEClient,
+    endpoints: dict[str, object],
+    device: ObservedDevice,
+    protocol_version: int | None,
+) -> SonyIdentity:
+    model = await _read_identity_value(client, endpoints.get(CAMERA_MODEL_UUID.lower()))
+    model = model or _fallback_model(device)
+    firmware = await _read_identity_value(client, endpoints.get(FIRMWARE_VERSION_UUID.lower()))
+    return SonyIdentity(model=model, firmware=firmware, protocol_version=protocol_version)
+
+
 async def _read_identity_value(client: SonyBLEClient, characteristic: object | None) -> str | None:
     if characteristic is None:
         return None
@@ -603,13 +608,7 @@ async def _read_identity_value(client: SonyBLEClient, characteristic: object | N
         )
     except (BleakError, TimeoutError, OSError):
         return None
-    try:
-        decoded = value.rstrip(b"\x00").decode("ascii").strip()
-    except UnicodeDecodeError:
-        return None
-    if not decoded or any(ord(character) < 0x20 or ord(character) > 0x7E for character in decoded):
-        return None
-    return decoded
+    return decode_identity_value(value)
 
 
 def _endpoints_for_service(

@@ -1,8 +1,10 @@
 import asyncio
 from typing import cast
 
+import pytest
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
+from bleak.exc import BleakError
 
 from sonygeotag.ble_probe import DEFAULT_TARGETS
 from sonygeotag.ble_probe import CharacteristicInfo
@@ -16,6 +18,11 @@ from sonygeotag.ble_probe import matches_targets
 from sonygeotag.ble_probe import normalize_characteristic_filters
 from sonygeotag.ble_probe import normalize_targets
 from sonygeotag.ble_probe import notification_event
+from sonygeotag.ble_probe import read_characteristic
+
+
+def test_original_bounded_read_entry_point_remains_an_alias() -> None:
+    assert _read_characteristic is read_characteristic
 
 
 def test_bytes_to_hex_spaces_bytes() -> None:
@@ -108,3 +115,71 @@ def test_notification_event_handles_characteristic_like_sender() -> None:
     assert event.handle == 51
     assert event.data == b"\x0a\x0b"
     assert event.to_dict()["data_hex"] == "0a 0b"
+
+
+@pytest.mark.parametrize("payload", [b"", b"\x01\x02", bytearray(b"\x01\x02")])
+def test_bounded_read_returns_immutable_bytes_and_passes_characteristic(payload) -> None:
+    characteristic = object()
+    calls = []
+
+    class Client:
+        async def read_gatt_char(self, characteristic):
+            calls.append(characteristic)
+            return payload
+
+    value, error = asyncio.run(_read_characteristic(Client(), characteristic, operation_timeout=1))
+
+    assert type(value) is bytes
+    assert value == bytes(payload)
+    assert error is None
+    assert calls == [characteristic]
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (BleakError("radio unavailable"), "BleakError: radio unavailable"),
+        (OSError("PRIVATE-ID"), "OSError: PRIVATE-ID"),
+        (TimeoutError("read stalled"), "TimeoutError: read stalled"),
+    ],
+)
+def test_bounded_read_retains_raw_diagnostic_errors(failure, expected) -> None:
+    class Client:
+        async def read_gatt_char(self, _characteristic):
+            raise failure
+
+    assert asyncio.run(_read_characteristic(Client(), object(), operation_timeout=1)) == (None, expected)
+
+
+@pytest.mark.parametrize("failure", [RuntimeError("unexpected"), asyncio.CancelledError()])
+def test_bounded_read_does_not_swallow_unexpected_errors_or_cancellation(failure) -> None:
+    class Client:
+        async def read_gatt_char(self, _characteristic):
+            raise failure
+
+    with pytest.raises(type(failure)) as raised:
+        asyncio.run(_read_characteristic(Client(), object(), operation_timeout=1))
+    assert raised.value is failure
+
+
+def test_cancelling_bounded_read_cancels_the_underlying_operation() -> None:
+    async def run():
+        started = asyncio.Event()
+        stopped = asyncio.Event()
+
+        class Client:
+            async def read_gatt_char(self, _characteristic):
+                started.set()
+                try:
+                    await asyncio.Future()
+                finally:
+                    stopped.set()
+
+        task = asyncio.create_task(_read_characteristic(Client(), object(), operation_timeout=60))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert stopped.is_set()
+
+    asyncio.run(run())
